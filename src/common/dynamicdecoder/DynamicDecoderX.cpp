@@ -298,9 +298,11 @@ void DynamicDecoderX::process(float *fFeatures, int iFeatures) {
 	for( ; t < iFeatures ; ++t, ++m_iTimeCurrent) {	
 	
 		// prune active nodes/tokens
+		//printf("pruning...\n");
 		pruning();
 		
 		// next frame expansion
+		//printf("expanding...\n");
 		expand(fFeatures+(t*m_iDim),m_iTimeCurrent);	
 		
 		// output search status

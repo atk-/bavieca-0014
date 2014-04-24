@@ -368,24 +368,25 @@ float *FeatureExtractor::extractFeatures(const char *strFile, unsigned int *iFea
 
 // extract static features in stream mode (make use of "left context" speech samples)
 float *FeatureExtractor::extractFeaturesStream(short *sSamples, unsigned int iSamples, unsigned int *iFeatures) {
-
 	float *fFeatures = NULL; 
 	//int iSamplesLeft = m_iSamplesFrame-m_iSamplesSkip;
 	if (m_iSamplesStream > 0) {
-		short *sSamplesAll = new short[iSamples+m_iSamplesUsefulPrev];	
+		short *sSamplesAll = new short[iSamples+m_iSamplesUsefulPrev];
 		memcpy(sSamplesAll,m_sSamplesUsefulPrev,m_iSamplesUsefulPrev*sizeof(short));
 		memcpy(sSamplesAll+m_iSamplesUsefulPrev,sSamples,iSamples*sizeof(short));
+
 		fFeatures = extractFeatures(sSamplesAll,iSamples+m_iSamplesUsefulPrev,iFeatures);
 		delete [] sSamplesAll;
 	} else {
 		fFeatures = extractFeatures(sSamples,iSamples,iFeatures);
 	}	
+
 	// update useful data from previous (current) chunk
 	m_iSamplesUsefulPrev = (((m_iSamplesUsefulPrev+iSamples)-m_iSamplesFrame)%m_iSamplesSkip)+(m_iSamplesFrame-m_iSamplesSkip);
 	assert(iSamples > m_iSamplesUsefulPrev);
+	*m_sSamplesUsefulPrev = (short)-1;
 	memcpy(m_sSamplesUsefulPrev,sSamples+(iSamples-m_iSamplesUsefulPrev),m_iSamplesUsefulPrev*sizeof(short));
 	m_iSamplesStream += iSamples;
-	
 	return fFeatures;
 }
 
@@ -414,14 +415,17 @@ float *FeatureExtractor::extractStaticFeatures(short *sSamples, unsigned int iSa
 
 	// mfcc
 	if (m_iType == FEATURE_TYPE_MFCC) {
+		printf("MFCC\n");
 		return extractStaticFeaturesMFCC(sSamples,iSamples,iFeatures);
 	} 
 	// plp
 	else if (m_iType == FEATURE_TYPE_PLP) {
+		printf("PLP\n");
 		return extractStaticFeaturesPLP(sSamples,iSamples,iFeatures);
 	} 
 	// not supported
 	else {
+		printf("no feature type defined!\n");
 		return NULL;
 	}
 }

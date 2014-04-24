@@ -54,7 +54,7 @@ void BestPath::print(bool bExtended) {
 			cout << " (gl= " << setw(12) << std::setiosflags(ios::fixed) << std::setprecision(4) << (*it)->fScore 
 			<< ") (am= " << setw(12) << std::setprecision(4) << (*it)->fScoreAcousticModel << ") (lm= " << setw(10)
 			<< std::setprecision(4) << (*it)->fScoreLanguageModel << ") (ip= " << setw(4) << (*it)->fInsertionPenalty 
-				<< ") (conf= " << setw(4) << (*it)->fScoreConfidence << ")" << endl;	
+				<< ") (conf= " << setw(4) << (*it)->fScoreConfidence << ")" << endl;
 		}
 	}
 }

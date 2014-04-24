@@ -353,6 +353,11 @@ void LMManager::loadARPA() {
 		for(int i = 0 ; i < m_iUnigrams ; ++i) {
 			iTotalBigrams += m_unigrams[i].iBigrams;
 		}
+
+		printf("iTotalBigrams: %d\n", iTotalBigrams);
+		printf("bigrams dropped: %d\n", m_iBigramsDropped);
+		printf("iBigrams: %d\n", m_iBigrams);
+
 		assert(iTotalBigrams+m_iBigramsDropped == m_iBigrams);
 	}
 	

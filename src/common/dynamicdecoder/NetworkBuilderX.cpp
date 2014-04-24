@@ -32,7 +32,7 @@ NetworkBuilderX::NetworkBuilderX(PhoneSet *phoneSet, HMMManager *hmmManager, Lex
 	m_lexiconManager = lexiconManager;
 	m_hmmManager = hmmManager;
 	m_phoneSet = phoneSet;
-	
+
 	m_iNodesTemp = 0;
 	m_iNodesTempRoot = 0;
 	m_iNodesTempFI = 0;	
@@ -42,16 +42,16 @@ NetworkBuilderX::NetworkBuilderX(PhoneSet *phoneSet, HMMManager *hmmManager, Lex
 	m_iNodesTempHMM = 0;
 	m_iNodesTempNull = 0;
 	m_iNodesDepth = 0;	
-	
+
 	m_iNodesTempID = 0;
-		
+
 	m_iArcsTemp = 0;
 	m_iArcsNull = 0;
 	m_iArcsHMM = 0;
 	m_iArcsWord = 0;
-   	
+
 	m_nodeTempRoot = NULL;
-	
+
 	// language model look-ahead
 	m_iLANodes = -1;
 	m_iLATree = NULL;	
@@ -66,110 +66,116 @@ NetworkBuilderX::~NetworkBuilderX()
 // - the goal is to minimize the number of hmm-nodes in the network, decoding speed is directly proportional
 //   to the number of active states, so we do not want redundant active states
 DynamicNetworkX *NetworkBuilderX::build() {
-	
-	double dTimeBegin = TimeUtils::getTimeMilliseconds();
-   
-   // get the context size
-   int iContextSizeWW = m_hmmManager->getContextSizeHMM();			// within-word
-   int iContextSizeCW = m_hmmManager->getContextSizeHMMCW();		// cross-word
-   int iBasePhones = m_phoneSet->size();								// used for context padding
-   
-   assert(iContextSizeWW == iContextSizeCW);
-   
-   // this ensures that the network is built right for context-independent models
-   if (iContextSizeWW == 0) {
-	   iContextSizeWW = iContextSizeCW = 1;
-   }   
 
-   // get the lexicon 
-   VLexUnit *lexicon = m_lexiconManager->getLexiconReference(); 
-   
-   // create the root node
-   m_nodeTempRoot = newNodeTempX(NODE_TYPE_ROOT,0);
-   
-   // allocate memory for mapping phonemes to IP values
-   float *fPhoneIP = new float[iBasePhones];
-   for(int i=0 ; i < iBasePhones ; ++i) {
-   	fPhoneIP[i] = FLT_MAX; 
-   }
-   
-   // get the length of the longest lexical unit
-   unsigned int iPhonesLongestLexicalUnit = 0;
-   for (VLexUnit::iterator it = lexicon->begin() ; it != lexicon->end() ; ++it) {
+	double dTimeBegin = TimeUtils::getTimeMilliseconds();
+
+	// get the context size
+	int iContextSizeWW = m_hmmManager->getContextSizeHMM();			// within-word
+	int iContextSizeCW = m_hmmManager->getContextSizeHMMCW();		// cross-word
+	int iBasePhones = m_phoneSet->size();								// used for context padding
+
+	printf("phone set is %d phones\n", iBasePhones);
+
+	assert(iContextSizeWW == iContextSizeCW);
+
+	// this ensures that the network is built right for context-independent models
+	if (iContextSizeWW == 0) {
+		iContextSizeWW = iContextSizeCW = 1;
+	}
+
+	// get the lexicon
+	VLexUnit *lexicon = m_lexiconManager->getLexiconReference();
+
+	// create the root node
+	m_nodeTempRoot = newNodeTempX(NODE_TYPE_ROOT,0);
+
+	// allocate memory for mapping phonemes to IP values
+	float *fPhoneIP = new float[iBasePhones];
+	for(int i=0 ; i < iBasePhones ; ++i) {
+		fPhoneIP[i] = FLT_MAX;
+	}
+
+	// get the length of the longest lexical unit
+	unsigned int iPhonesLongestLexicalUnit = 0;
+	for (VLexUnit::iterator it = lexicon->begin() ; it != lexicon->end() ; ++it) {
 		// keep the max number of phones
 		if ((unsigned int)(*it)->vPhones.size() > iPhonesLongestLexicalUnit) {
 			iPhonesLongestLexicalUnit = (int)(*it)->vPhones.size();
 		}
-   }
+	}
 
-   // compute node-depths at different layers
-   m_iDepthFI = 1;
-   m_iDepthMI = 5;
-   m_iDepthFO = m_iDepthMI + (iPhonesLongestLexicalUnit-2)*NUMBER_HMM_STATES + 1;
- 
-   // get all the possible left/right contexts (word ends/beginnings)
-   MContextBool mContextLeft;
-   MContextBool mContextRight;
-   MContextNode mContextBeg;				// word beginnings
-   MContextNode mContextEnd;				// word ends
-   MContextV mContextBegV;					// word beginnings
-   MContextV mContextEndV;					// word ends
-   
-   unsigned char *iContextLeft = new unsigned char[iContextSizeCW+1]; 
-   unsigned char *iContextRight = new unsigned char[iContextSizeCW+1]; 
-   unsigned char *iContextBeg = new unsigned char[iContextSizeWW+2]; 
-   unsigned char *iContextBegPartial = new unsigned char[iContextSizeWW+1]; 
-   unsigned char *iContextEnd = new unsigned char[iContextSizeWW+2];
-   unsigned char *iContextEndPartial = new unsigned char[iContextSizeWW+1];
-   for(VLexUnit::iterator it = lexicon->begin() ; it != lexicon->end() ; ++it) {
-   	
-   	// only standard and filler lexical units (no sentence markers)
-   	if (((*it)->iType != LEX_UNIT_TYPE_STANDARD) && ((*it)->iType != LEX_UNIT_TYPE_FILLER)) {
-   		continue;
-   	}
-   	
-   	// keep the IP value
-   	if (fPhoneIP[(*it)->vPhones.front()] == FLT_MAX) {
-   		fPhoneIP[(*it)->vPhones.front()] = (*it)->fInsertionPenalty;
-   	} else if (fPhoneIP[(*it)->vPhones.front()] != (*it)->fInsertionPenalty) {
-   		BVC_ERROR << "two lexical units with different insertion penalties share their initial phone";
-   	}
-   	
-   	int iPhones = (int)(*it)->vPhones.size();
-   	int iContextLength = min(iContextSizeCW,(int)(*it)->vPhones.size());
-   	int iPhonesWW = min(iContextSizeWW+1,(int)(*it)->vPhones.size());
-   	
-   	// (1) get all the context
-   	
-   	// (1.1) left context
-   	// context padding
-   	for(int i=0 ; i < iContextSizeCW-iContextLength ; ++i) {
+	printf("longest lexical unit is %d phones\n", iPhonesLongestLexicalUnit);
+
+	// compute node-depths at different layers
+	m_iDepthFI = 1;
+	m_iDepthMI = 5;
+	m_iDepthFO = m_iDepthMI + (iPhonesLongestLexicalUnit-2)*NUMBER_HMM_STATES + 1;
+
+	// get all the possible left/right contexts (word ends/beginnings)
+	MContextBool mContextLeft;
+	MContextBool mContextRight;
+	MContextNode mContextBeg;				// word beginnings
+	MContextNode mContextEnd;				// word ends
+	MContextV mContextBegV;					// word beginnings
+	MContextV mContextEndV;					// word ends
+
+	unsigned char *iContextLeft = new unsigned char[iContextSizeCW+1];
+	unsigned char *iContextRight = new unsigned char[iContextSizeCW+1];
+	unsigned char *iContextBeg = new unsigned char[iContextSizeWW+2];
+	unsigned char *iContextBegPartial = new unsigned char[iContextSizeWW+1];
+	unsigned char *iContextEnd = new unsigned char[iContextSizeWW+2];
+	unsigned char *iContextEndPartial = new unsigned char[iContextSizeWW+1];
+
+	int counter = 0;
+
+	for(VLexUnit::iterator it = lexicon->begin() ; it != lexicon->end() ; ++it) {
+		// only standard and filler lexical units (no sentence markers)
+		if (((*it)->iType != LEX_UNIT_TYPE_STANDARD) && ((*it)->iType != LEX_UNIT_TYPE_FILLER)) {
+			continue;
+		}
+
+		// keep the IP value
+		if (fPhoneIP[(*it)->vPhones.front()] == FLT_MAX) {
+			fPhoneIP[(*it)->vPhones.front()] = (*it)->fInsertionPenalty;
+		} else if (fPhoneIP[(*it)->vPhones.front()] != (*it)->fInsertionPenalty) {
+			BVC_ERROR << "two lexical units with different insertion penalties share their initial phone";
+		}
+
+		int iPhones = (int)(*it)->vPhones.size();
+		int iContextLength = min(iContextSizeCW,(int)(*it)->vPhones.size());
+		int iPhonesWW = min(iContextSizeWW+1,(int)(*it)->vPhones.size());
+
+		// (1) get all the context
+
+		// (1.1) left context
+		// context padding
+		for(int i=0 ; i < iContextSizeCW-iContextLength ; ++i) {
 			iContextLeft[i] = iBasePhones; 
-   	}
-   	// actual context
-   	for(int i=0 ; i < iContextLength ; ++i) {
+		}
+		// actual context
+		for(int i=0 ; i < iContextLength ; ++i) {
 			iContextLeft[iContextSizeCW-iContextLength+i] = (*it)->vPhones[(iPhones-iContextLength)+i]; 
-   	}
-   	iContextLeft[iContextSizeCW] = UCHAR_MAX;
-   	if (mContextLeft.find(iContextLeft) == mContextLeft.end()) {
-   		mContextLeft.insert(MContextBool::value_type(copyContext(iContextLeft,iContextSizeCW),true));
-   	}
-   	
-   	// (1.2) right context
-   	// context padding
-   	for(int i=iContextLength ; i < iContextSizeCW ; ++i) {
+		}
+		iContextLeft[iContextSizeCW] = UCHAR_MAX;
+		if (mContextLeft.find(iContextLeft) == mContextLeft.end()) {
+			mContextLeft.insert(MContextBool::value_type(copyContext(iContextLeft,iContextSizeCW),true));
+		}
+
+		// (1.2) right context
+		// context padding
+		for(int i=iContextLength ; i < iContextSizeCW ; ++i) {
 			iContextRight[i] = iBasePhones; 
-   	}
-   	// actual context
-   	for(int i=0 ; i < iContextLength ; ++i) {
+		}
+		// actual context
+		for(int i=0 ; i < iContextLength ; ++i) {
 			iContextRight[i] = (*it)->vPhones[i]; 
-   	}
-   	iContextRight[iContextSizeCW] = UCHAR_MAX;
-   	if (mContextRight.find(iContextRight) == mContextRight.end()) {
-   		mContextRight.insert(MContextBool::value_type(copyContext(iContextRight,iContextSizeCW),true));	
-   	}
-   	
-   	// (1.3) word-ends (needed to create the FO-nodes)
+		}
+		iContextRight[iContextSizeCW] = UCHAR_MAX;
+		if (mContextRight.find(iContextRight) == mContextRight.end()) {
+			mContextRight.insert(MContextBool::value_type(copyContext(iContextRight,iContextSizeCW),true));
+		}
+
+		// (1.3) word-ends (needed to create the FO-nodes)
 		// context padding
 		for(int i=0 ; i < iContextSizeWW+1-iPhonesWW ; ++i) {
 			iContextEnd[i] = iBasePhones; 
@@ -197,7 +203,7 @@ DynamicNetworkX *NetworkBuilderX::build() {
 			//	(copyContext(iContextEnd,iContextSizeWW+1),nodeFO));
 			mContextEnd.insert(MContextNode::value_type(copyContext(iContextEnd,iContextSizeWW+1),nodeFO));
 		}
-		
+
 		// (1.4) word-beginning (needed to create the MI-nodes)
 		// context padding
 		for(int i=iPhonesWW ; i < iContextSizeWW+1 ; ++i) {
@@ -223,45 +229,44 @@ DynamicNetworkX *NetworkBuilderX::build() {
 			mContextBeg.insert(MContextNode::value_type(copyContext(iContextBeg,iContextSizeWW+1),nodeMI));
 		}
 	}
-	
+
 	// clean-up
-   delete [] iContextLeft; 
-   delete [] iContextRight; 
-   delete [] iContextBeg; 
-   delete [] iContextBegPartial;
-   delete [] iContextEnd;
-   delete [] iContextEndPartial;
-	 	
+	delete [] iContextLeft;
+	delete [] iContextRight;
+	delete [] iContextBeg;
+	delete [] iContextBegPartial;
+	delete [] iContextEnd;
+	delete [] iContextEndPartial;
+
 	BVC_VERB << "left contexts:     " << setw(9) << mContextLeft.size();
 	BVC_VERB << "right contexts:    " << setw(9) << mContextRight.size();
 	BVC_VERB << "word begs:         " << setw(9) << mContextBeg.size();
 	BVC_VERB << "word ends:         " << setw(9) << mContextEnd.size();
 	BVC_VERB << "word begs partial: " << setw(9) << mContextBegV.size();
 	BVC_VERB << "word ends partial: " << setw(9) << mContextEndV.size();
-	   
-   map<int,bool> mHMMUsed;
-	
+
+	map<int,bool> mHMMUsed;
+
 	// (1) HEAD-NETWORK
 	// - use auxiliar FI-nodes and MI-nodes, they are useful for minimization. They will be removed
 	//   when connecting the head-network to the other subnetworks 
-	
-   MContextNode mNodesFI;
-   VNodeTempX vNodesFIUnique;
-		
+
+	MContextNode mNodesFI;
+	VNodeTempX vNodesFIUnique;
+
 	// allocate data structures
 	NodeMergeInfo *fiNodeMergeInfo = new NodeMergeInfo[mContextLeft.size()];
 	unsigned char *iPhoneLeft = new unsigned char[iContextSizeCW];
 	unsigned char *iPhoneRight = new unsigned char[iContextSizeWW];	
-	
+
 	// create the head network
 	for(MContextV::iterator it = mContextBegV.begin() ; it != mContextBegV.end() ; ++it) {
-	
 		// keep the MI-nodes
 		VNodeTempX vNodeTempMI;
 		for(vector<pair<unsigned char*,NodeTempX*> >::iterator jt = it->second.begin() ; jt != it->second.end() ; ++jt) {
 			vNodeTempMI.push_back(jt->second);
 		}
-		
+
 		int iFI = 0;
 		for(MContextBool::iterator jt = mContextLeft.begin() ; jt != mContextLeft.end() ; ++jt, ++iFI) {
 
@@ -274,7 +279,7 @@ DynamicNetworkX *NetworkBuilderX::build() {
 			iKey[2*iContextSizeCW] = UCHAR_MAX;
 			NodeTempX *nodeFI = newNodeTempX(NODE_TYPE_FI,m_iDepthFI);
 			nodeFI->iFI = iFI;
-				
+
 			fiNodeMergeInfo[iFI].iMerged = -1;
 			fiNodeMergeInfo[iFI].node = nodeFI;	
 			fiNodeMergeInfo[iFI].iKey = iKey;
@@ -282,31 +287,31 @@ DynamicNetworkX *NetworkBuilderX::build() {
 			for(int i=0 ; i < iContextSizeCW ; ++i) {
 				iPhoneLeft[i] = jt->first[i];
 			}	
-	
+
 			// MI-nodes
 			for(vector<pair<unsigned char*,NodeTempX*> >::iterator kt = it->second.begin() ; kt != it->second.end() ; ++kt) {
-				
+
 				NodeTempX *nodeMI = kt->second;
-				
+
 				// ignore MI-node for monophone lexical units
 				if (kt->first[1] == iBasePhones) {	
 					continue;
 				}	
-				
+
 				unsigned char iPhone = kt->first[0];
 				for(int i=0 ; i < iContextSizeWW ; ++i) {
 					iPhoneRight[i] = kt->first[1+i];
 				}
-					
+
 				// get the sequence of states for the n-phone
 				NodeTempX *nodePrev = nodeFI;
 				for(int iState=0 ; iState < NUMBER_HMM_STATES ; ++iState) {
-				
+
 					// get the HMM-state
 					HMMStateDecoding *state = m_hmmManager->getHMMStateDecoding(iPhoneLeft,iPhone,iPhoneRight,
-						WITHIN_WORD_POSITION_START,iState);
+							WITHIN_WORD_POSITION_START,iState);
 					mHMMUsed[state->getId()] = true;
-				
+
 					// insert a node per HMM-state if they do not exist yet
 					NodeTempX *nodeAux = NULL;
 					for(LArcTempX::iterator kt = nodePrev->lArcNext.begin() ; kt != nodePrev->lArcNext.end() ; ++kt) {
@@ -315,18 +320,18 @@ DynamicNetworkX *NetworkBuilderX::build() {
 							break;
 						}
 					}	
-					
+
 					char iIPIndex = -1;
 					if (iState == 0) {
 						assert(fPhoneIP[iPhone] != FLT_MAX);
 						iIPIndex = iPhone;
 					}
-					
+
 					if (nodeAux == NULL) {
 						nodeAux = newNodeTempX(NODE_TYPE_HMM,m_iDepthFI+iState+1,state,iIPIndex);
 						newArcTempX(nodePrev,nodeAux,ARC_TYPE_NULL,NULL,NULL);
 					}
-					
+
 					// connect to the MI-node
 					if (iState == NUMBER_HMM_STATES-1) {
 						newArcTempX(nodeAux,nodeMI,ARC_TYPE_NULL,NULL,NULL);	
@@ -354,35 +359,35 @@ DynamicNetworkX *NetworkBuilderX::build() {
 				mNodesFI.insert(MContextNode::value_type(fiNodeMergeInfo[i].iKey,fiNodeMergeInfo[iMerged].node));
 			}
 		}
-   }
-   
-   delete [] iPhoneRight;
-   delete [] iPhoneLeft; 
-   delete [] fiNodeMergeInfo;
-	
+	}
+
+	delete [] iPhoneRight;
+	delete [] iPhoneLeft;
+	delete [] fiNodeMergeInfo;
+
 	print();
-	
+
 	// (2) TAIL-NETWORK
 	// - use auxiliar FI-nodes and MI-nodes, they are useful for minimization. They will be removed
 	//   when connecting the head-network to the other subnetworks 
-   
-   int iLeft = (int)mContextEndV.size();
-   
-   NodeMergeInfo *foNodeMergeInfo = new NodeMergeInfo[m_iNodesTempFO];
-   int iIndex=0;
-   for(MContextNode::iterator it = mContextEnd.begin() ; it != mContextEnd.end() ; ++it, ++iIndex) {
+
+	int iLeft = (int)mContextEndV.size();
+
+	NodeMergeInfo *foNodeMergeInfo = new NodeMergeInfo[m_iNodesTempFO];
+	int iIndex=0;
+	for(MContextNode::iterator it = mContextEnd.begin() ; it != mContextEnd.end() ; ++it, ++iIndex) {
 		foNodeMergeInfo[iIndex].node = it->second;
 		it->second->iFI = iIndex;
 		foNodeMergeInfo[iIndex].iMerged = -1;
 		foNodeMergeInfo[iIndex].iKey = it->first;
-   }
-   assert(iIndex == m_iNodesTempFO);
-	
+	}
+	assert(iIndex == m_iNodesTempFO);
+
 	// create the head network
 	for(MContextV::iterator jt = mContextEndV.begin() ; jt != mContextEndV.end() ; ++jt, --iLeft) {	
-	
+
 		for(MContextBool::iterator it = mContextRight.begin() ; it != mContextRight.end() ; ++it) {
-				
+
 			// get the FI-node
 			unsigned char *iKey = new unsigned char[2*iContextSizeCW+1];
 			for(int i=0 ; i<iContextSizeCW ; ++i) {
@@ -395,40 +400,40 @@ DynamicNetworkX *NetworkBuilderX::build() {
 				print(iKey);
 			}
 			delete [] iKey;
-			
+
 			assert(nodeFI != NULL);
-			
+
 			unsigned char *iPhoneRight = new unsigned char[iContextSizeCW];
 			for(int i=0 ; i < iContextSizeCW ; ++i) {
 				iPhoneRight[i] = it->first[i];
 			}	
-				
+
 			// FO-nodes
 			for(vector<pair<unsigned char*,NodeTempX*> >::iterator kt = jt->second.begin() ; kt != jt->second.end() ; ++kt) {
-				
+
 				NodeTempX *nodeFO = kt->second;
-				
+
 				// ignore FO-node for monophone lexical units
 				if (kt->first[iContextSizeCW-1] == iBasePhones) {
 					continue;
 				}
-					
+
 				unsigned char iPhone = kt->first[iContextSizeWW];
 				assert(iPhone != iBasePhones);
 				unsigned char *iPhoneLeft = new unsigned char[iContextSizeWW];
 				for(int i=0 ; i < iContextSizeWW ; ++i) {
 					iPhoneLeft[i] = kt->first[i];
 				}
-					
+
 				// get the sequence of states for the n-phone
 				NodeTempX *nodePrev = nodeFO;
 				for(int iState=0 ; iState < NUMBER_HMM_STATES ; ++iState) {
-				
+
 					// get the HMM-state
 					HMMStateDecoding *state = m_hmmManager->getHMMStateDecoding(iPhoneLeft,iPhone,iPhoneRight,
-						WITHIN_WORD_POSITION_END,iState);
+							WITHIN_WORD_POSITION_END,iState);
 					mHMMUsed[state->getId()] = true;
-				
+
 					// insert a node per HMM-state if they do not exist yet
 					NodeTempX *nodeAux = NULL;
 					for(LArcTempX::iterator kt = nodePrev->lArcNext.begin() ; kt != nodePrev->lArcNext.end() ; ++kt) {
@@ -437,7 +442,7 @@ DynamicNetworkX *NetworkBuilderX::build() {
 							break;
 						}
 					}	
-					
+
 					if (nodeAux == NULL) {
 						nodeAux = newNodeTempX(NODE_TYPE_HMM,m_iDepthFO+iState+1,state);
 						if (iState == NUMBER_HMM_STATES-1) {
@@ -455,12 +460,12 @@ DynamicNetworkX *NetworkBuilderX::build() {
 			}
 			delete [] iPhoneRight;
 		}
-   }
-	
+	}
+
 	// minimize backwards from the FI nodes
 	BVC_VERB << "merging backward";
 	mergeBackwardFI(vNodesFIUnique,foNodeMergeInfo);
-	
+
 	// keep surviving FO-nodes
 	for(unsigned int i=0 ; i < mContextEnd.size() ; ++i) {
 		// (b) FO-node was merged: point to the one that will be kept
@@ -473,42 +478,42 @@ DynamicNetworkX *NetworkBuilderX::build() {
 		}
 	}	
 	delete [] foNodeMergeInfo;
-	
+
 	print();
-	
+
 	for(VNodeTempX::iterator it = vNodesFIUnique.begin() ; it != vNodesFIUnique.end() ; ++it) {
 		newArcTempX(m_nodeTempRoot,*it,ARC_TYPE_NULL,NULL,NULL);
 	}
-	
+
 	print();
-	
+
 	VLexUnit *vLexUnitMonophone = new VLexUnit[iBasePhones];
-   
-  	// (3) INTERNAL-NETWORK (insert one lexical unit at a time)
-   for (VLexUnit::iterator it = lexicon->begin() ; it != lexicon->end() ; ++it) {
-   	
-   	// only standard and filler lexical units (no sentence markers)
-   	if (((*it)->iType != LEX_UNIT_TYPE_STANDARD) && ((*it)->iType != LEX_UNIT_TYPE_FILLER)) {
-   		continue;
-   	}
-  	
-   	// get the number of phones in the word
-   	int iPhones = (int)(*it)->vPhones.size();
-   	
-   	// (7.1) monophone lexical units
-   	if (iPhones == 1) {
-   	
-   		// keep the monophone lexical unit to be processed later
-   		vLexUnitMonophone[(*it)->vPhones.front()].push_back(*it); 	
-   	}	
-   	// (7.2) multiple-phone lexical units
-   	else if (iPhones > 1) {
-   	
+
+	// (3) INTERNAL-NETWORK (insert one lexical unit at a time)
+	for (VLexUnit::iterator it = lexicon->begin() ; it != lexicon->end() ; ++it) {
+
+		// only standard and filler lexical units (no sentence markers)
+		if (((*it)->iType != LEX_UNIT_TYPE_STANDARD) && ((*it)->iType != LEX_UNIT_TYPE_FILLER)) {
+			continue;
+		}
+
+		// get the number of phones in the word
+		int iPhones = (int)(*it)->vPhones.size();
+
+		// (7.1) monophone lexical units
+		if (iPhones == 1) {
+
+			// keep the monophone lexical unit to be processed later
+			vLexUnitMonophone[(*it)->vPhones.front()].push_back(*it);
+		}
+		// (7.2) multiple-phone lexical units
+		else if (iPhones > 1) {
+
 			int iPhonesWW = min(iContextSizeWW+1,(int)(*it)->vPhones.size());
-	
+
 			// (1) get the MI-node
 			unsigned char *iKeyMI = new unsigned char[iContextSizeWW+2];
-			
+
 			// padding
 			for(int i=iPhonesWW ; i < iContextSizeWW+1 ; ++i) {
 				iKeyMI[i] = iBasePhones; 
@@ -518,10 +523,10 @@ DynamicNetworkX *NetworkBuilderX::build() {
 				iKeyMI[i] = (*it)->vPhones[i]; 
 			}
 			iKeyMI[iContextSizeWW+1] = UCHAR_MAX;
-			
+
 			// (2) get the FO-node
 			unsigned char *iKeyFO = new unsigned char[iContextSizeWW+2];
-		
+
 			// padding
 			for(int i=0 ; i < iContextSizeWW+1-iPhonesWW ; ++i) {
 				iKeyFO[i] = iBasePhones; 
@@ -531,28 +536,28 @@ DynamicNetworkX *NetworkBuilderX::build() {
 				iKeyFO[iContextSizeWW+1-iPhonesWW+i] = (*it)->vPhones[iPhones-(iPhonesWW-i)]; 
 			}
 			iKeyFO[iContextSizeWW+1] = UCHAR_MAX;
-			
+
 			// get the MI-node
 			NodeTempX *nodeMI = mContextBeg[iKeyMI];	
 			// get the FO-node
 			NodeTempX *nodeFO = mContextEnd[iKeyFO];	
-			
+
 			//print(iKeyMI);
 			//print(iKeyFO);
-			
+
 			delete [] iKeyMI;
 			delete [] iKeyFO;
-			
+
 			assert(nodeMI != NULL);
 			assert(nodeFO != NULL);
-			
+
 			NodeTempX *nodePrev = nodeMI;
 			for(int i=1 ; i < iPhones-1 ; ++i) {
-			
+
 				unsigned char iPhone = (*it)->vPhones[i];
 				unsigned char *iPhoneLeft = new unsigned char[iContextSizeWW];
 				unsigned char *iPhoneRight = new unsigned char[iContextSizeWW];
-	
+
 				// left context
 				unsigned char iPhonesAvailableLeft = min(iContextSizeWW,i);
 				// padding
@@ -563,7 +568,7 @@ DynamicNetworkX *NetworkBuilderX::build() {
 				for(int j=0 ; j < iPhonesAvailableLeft ; ++j) {
 					iPhoneLeft[iContextSizeWW-j-1] = (*it)->vPhones[i-j-1];
 				}	
-				
+
 				// right context
 				unsigned char iPhonesAvailableRight = min(iContextSizeWW,iPhones-i-1);
 				// context 
@@ -574,20 +579,20 @@ DynamicNetworkX *NetworkBuilderX::build() {
 				for(int j=iPhonesAvailableRight ; j < iContextSizeWW ; ++j) {
 					iPhoneRight[j] = iBasePhones;
 				}
-				
+
 				//print(iPhoneLeft,2);
 				//print(iPhoneRight,2);
-			
+
 				//printf("%s-%s+%s\n",m_phoneSet->getStrPhone(iPhoneLeft[0]),m_phoneSet->getStrPhone(iPhone),m_phoneSet->getStrPhone(iPhoneRight[0]));
-				
+
 				// get the sequence of states for the n-phone
 				for(int iState=0 ; iState < NUMBER_HMM_STATES ; ++iState) {
-				
+
 					// get the HMM-state
 					HMMStateDecoding *state = m_hmmManager->getHMMStateDecoding(iPhoneLeft,iPhone,iPhoneRight,
-						WITHIN_WORD_POSITION_INTERNAL,iState);
+							WITHIN_WORD_POSITION_INTERNAL,iState);
 					mHMMUsed[state->getId()] = true;
-					
+
 					// insert a node per HMM-state if they do not exist yet
 					NodeTempX *nodeAux = NULL;
 					for(LArcTempX::iterator kt = nodePrev->lArcNext.begin() ; kt != nodePrev->lArcNext.end() ; ++kt) {
@@ -596,7 +601,7 @@ DynamicNetworkX *NetworkBuilderX::build() {
 							break;
 						}
 					}	
-					
+
 					if (nodeAux == NULL) {
 						nodeAux = newNodeTempX(NODE_TYPE_HMM,m_iDepthMI+1+((i-1)*NUMBER_HMM_STATES)+iState,state);
 						/*if (nodePrev == nodeMI) {
@@ -604,7 +609,7 @@ DynamicNetworkX *NetworkBuilderX::build() {
 								newArcTempX((*kt)->nodeSource,nodeAux,ARC_TYPE_NULL,NULL,NULL,false,-1);
 							}
 						} else {*/
-							newArcTempX(nodePrev,nodeAux,ARC_TYPE_NULL,NULL,NULL);
+						newArcTempX(nodePrev,nodeAux,ARC_TYPE_NULL,NULL,NULL);
 						//}
 					} 
 					nodePrev = nodeAux;
@@ -612,35 +617,35 @@ DynamicNetworkX *NetworkBuilderX::build() {
 				delete [] iPhoneLeft;
 				delete [] iPhoneRight;
 			}
-			
+
 			// create the WI arc to the FO-node
 			newArcTempX(nodePrev,nodeFO,ARC_TYPE_WORD,NULL,*it);
 		}
 	}
-	
+
 	// deal with monophone lexical units
 	unsigned char *iKeyFI = new unsigned char[iContextSizeCW+iContextSizeWW+1];
 	unsigned char *iKeyFIDest = new unsigned char[iContextSizeCW+iContextSizeWW+1];
-	
+
 	double dTimeBeginMonophones = TimeUtils::getTimeMilliseconds();
-   
+
 	// for each possible phone	
 	for(int iPhone=0 ; iPhone < iBasePhones ; ++iPhone) {
-		
+
 		if (vLexUnitMonophone[iPhone].empty()) {
 			continue;
 		}
-		
+
 		BVC_VERB << "phone: " << m_phoneSet->getStrPhone(iPhone);
 		int iHMMNodes = 0;
-		
+
 		hash_map<int,NodeTempX*> mFIWordNode;
 		VNodeTempX vNodeWord;
-		
+
 		// get all the possible destination FI-nodes
 		vector< pair<unsigned char*,NodeTempX*> > vNodeFIDest;
 		for(MContextBool::iterator kt = mContextRight.begin() ; kt != mContextRight.end() ; ++kt) {
-		
+
 			// get the destination FI-node
 			for(int i=0 ; i < iContextSizeCW-1 ; ++i) {
 				iKeyFIDest[i] = iBasePhones;
@@ -654,10 +659,10 @@ DynamicNetworkX *NetworkBuilderX::build() {
 			assert(nodeFIDest != NULL);
 			vNodeFIDest.push_back(pair<unsigned char*,NodeTempX*>(copyContext(iKeyFIDest,2*iContextSizeCW),nodeFIDest));	
 		}	
-		
+
 		// for each possible left cross-word context	
 		for(MContextBool::iterator jt = mContextLeft.begin() ; jt != mContextLeft.end() ; ++jt) {	
-			
+
 			// get the FI-node
 			for(int i=0 ; i < iContextSizeCW ; ++i) {
 				iKeyFI[i] = jt->first[i];
@@ -669,22 +674,22 @@ DynamicNetworkX *NetworkBuilderX::build() {
 			iKeyFI[iContextSizeCW+iContextSizeWW] = UCHAR_MAX;
 			NodeTempX *nodeFI = mNodesFI[iKeyFI];	
 			assert(nodeFI != NULL);	
-			
+
 			unsigned char *iPhoneLeft = new unsigned char[iContextSizeWW];	
 			unsigned char *iPhoneRight = new unsigned char[iContextSizeWW];	
-			
+
 			// left context	
 			for(int i=0 ; i < iContextSizeCW ; ++i) {
 				iPhoneLeft[i] = jt->first[i];
 			}		
-			
+
 			// for each possible destination FI-node
 			for(vector< pair<unsigned char*,NodeTempX*> >::iterator kt = vNodeFIDest.begin() ; 
-				kt != vNodeFIDest.end() ; ++kt) {
+					kt != vNodeFIDest.end() ; ++kt) {
 
 				NodeTempX *nodeFIDest = kt->second;	
 				assert(nodeFIDest != NULL);
-				
+
 				NodeTempX *nodeWord = NULL;
 				hash_map<int,NodeTempX*>::iterator lt = mFIWordNode.find(nodeFIDest->iNode);
 				if (lt == mFIWordNode.end()) {
@@ -693,28 +698,28 @@ DynamicNetworkX *NetworkBuilderX::build() {
 					NodeTempX *nodeWord2 = newNodeTempX(NODE_TYPE_NULL,m_iDepthFI+1+NUMBER_HMM_STATES,NULL);
 					mFIWordNode[nodeFIDest->iNode] = nodeWord;
 					for(VLexUnit::iterator it = vLexUnitMonophone[iPhone].begin(); 
-						it != vLexUnitMonophone[iPhone].end() ; ++it) {
+							it != vLexUnitMonophone[iPhone].end() ; ++it) {
 						newArcTempX(nodeWord,nodeWord2,ARC_TYPE_WORD,NULL,*it);	
 					}
 					newArcTempX(nodeWord2,nodeFIDest,ARC_TYPE_NULL,NULL,NULL);	
 				} else {	
 					nodeWord = lt->second;
 				}
-				
+
 				// right context	
 				for(int i=0 ; i < iContextSizeCW ; ++i) {
 					iPhoneRight[i] = kt->first[iContextSizeCW+i];
 				}
-		
+
 				// get the sequence of states for the n-phone
 				NodeTempX *nodePrev = nodeFI;
 				for(int iState=0 ; iState < NUMBER_HMM_STATES ; ++iState) {
-				
+
 					// get the HMM-state
 					HMMStateDecoding *state = m_hmmManager->getHMMStateDecoding(iPhoneLeft,iPhone,iPhoneRight,
-						WITHIN_WORD_POSITION_MONOPHONE,iState);
+							WITHIN_WORD_POSITION_MONOPHONE,iState);
 					mHMMUsed[state->getId()] = true;	
-						
+
 					// insert a node per HMM-state if they do not exist yet
 					NodeTempX *nodeAux = NULL;
 					for(LArcTempX::iterator kt = nodePrev->lArcNext.begin() ; kt != nodePrev->lArcNext.end() ; ++kt) {
@@ -723,14 +728,14 @@ DynamicNetworkX *NetworkBuilderX::build() {
 							break;
 						}
 					}	
-					
+
 					// insertion penalty?
 					char iIPIndex = -1;
 					if (iState == 0) {
 						assert(fPhoneIP[iPhone] != FLT_MAX);
 						iIPIndex = iPhone;
 					}
-					
+
 					if (nodeAux == NULL) {
 						// create the node and the arc
 						nodeAux = newNodeTempX(NODE_TYPE_HMM,m_iDepthFI+1+iState,state,iIPIndex);
@@ -742,7 +747,7 @@ DynamicNetworkX *NetworkBuilderX::build() {
 					}
 					// connect to the destination FI-node through a word-arc
 					if (iState == NUMBER_HMM_STATES-1) {
-					
+
 						bool bFound = false;
 						for(LArcTempX::iterator kt = nodeAux->lArcNext.begin() ; kt != nodeAux->lArcNext.end() ; ++kt) {
 							if ((*kt)->nodeDest == nodeWord) {
@@ -764,27 +769,27 @@ DynamicNetworkX *NetworkBuilderX::build() {
 				kt != vNodeFIDest.end() ; ++kt) {
 			delete [] kt->first;
 		}
-		
+
 		BVC_VERB << "hmm-nodes: " << iHMMNodes;
 		BVC_VERB << "elements: " << mFIWordNode.size();
-		
+
 		// backward-merge from word nodes
 		mergeBackwardWordNodes(vNodeWord);
 	}
 	delete [] vLexUnitMonophone;
 	delete [] iKeyFIDest;
 	delete [] iKeyFI;
-	
+
 	double dTimeEndMonophones = TimeUtils::getTimeMilliseconds();
-   
-   BVC_VERB << "monophones: " << (dTimeEndMonophones-dTimeBeginMonophones)/1000.0;
-   
-   // checks
-   int iIgnoredMI = 0;
-   int iIgnoredFO = 0;
+
+	BVC_VERB << "monophones: " << (dTimeEndMonophones-dTimeBeginMonophones)/1000.0;
+
+	// checks
+	int iIgnoredMI = 0;
+	int iIgnoredFO = 0;
 
 	for(MContextNode::iterator it = mContextEnd.begin() ; it != mContextEnd.end() ; ++it) {
-		
+
 		NodeTempX *nodeFO = it->second;
 		if (nodeFO->lArcPrev.empty() && nodeFO->lArcNext.empty()) {
 			++iIgnoredFO;
@@ -796,7 +801,7 @@ DynamicNetworkX *NetworkBuilderX::build() {
 		}
 	}
 	for(MContextNode::iterator it = mContextBeg.begin() ; it != mContextBeg.end() ; ++it) {
-		
+
 		NodeTempX *nodeMI = it->second;
 		if (nodeMI->lArcPrev.empty() && nodeMI->lArcNext.empty()) {
 			++iIgnoredMI;
@@ -808,85 +813,85 @@ DynamicNetworkX *NetworkBuilderX::build() {
 		}
 	}
 	BVC_VERB << "ignored MI: " << iIgnoredMI << " FO: " << iIgnoredFO;
-   
-   //removeMINodes(mContextBeg);
-   
-   BVC_VERB << "HMMs: " << m_hmmManager->getNumberHMMStatesPhysical() << " used: " << mHMMUsed.size();
-	
- 
-   BVC_VERB << "FI-nodes: " << mNodesFI.size();
-   BVC_VERB << "MI-nodes: " << mContextBeg.size();
-   BVC_VERB << "FO-nodes: " << mContextEnd.size();
-   
-   // Forward-merge
-   print();
-   mergeForward();
-   //print();
-   mergeForward();
-   //print();
-	
+
+	//removeMINodes(mContextBeg);
+
+	BVC_VERB << "HMMs: " << m_hmmManager->getNumberHMMStatesPhysical() << " used: " << mHMMUsed.size();
+
+
+	BVC_VERB << "FI-nodes: " << mNodesFI.size();
+	BVC_VERB << "MI-nodes: " << mContextBeg.size();
+	BVC_VERB << "FO-nodes: " << mContextEnd.size();
+
+	// Forward-merge
+	print();
+	mergeForward();
+	//print();
+	mergeForward();
+	//print();
+
 	// Word-label pushing
-   pushWordLabels();
-   //print();
-   
-   // Backward-merge
-   // note: two passes are typically necessary and enough, some FI-nodes merged in the first pass 
-   //       enable merging of NULL-nodes in the second pass
-   mergeBackward(); 
-   //print();
-   mergeBackward(); 
-   //print();
-   
-   // FI removal (FI-nodes, which were used to build the network are no longer necessary)
-  	removeFINodes();
-   //print(); 
-   mergeForward();
-   mergeBackward();
-   print();
-      
-   // build the language model look-ahead tree (needed to compute look-ahead scores)
-   m_iLANodes = -1;
-   m_iLATree = buildLMLookAheadTree(&m_iLANodes);
-    
-   // clean-up
-   vector<unsigned char*> vTrash;
-   for(MContextBool::iterator it = mContextLeft.begin() ; it != mContextLeft.end() ; ++it) {
-   	vTrash.push_back(it->first);
-   }
-   for(MContextBool::iterator it = mContextRight.begin() ; it != mContextRight.end() ; ++it) {
-   	vTrash.push_back(it->first);
-   }
-   for(MContextNode::iterator it = mContextBeg.begin() ; it != mContextBeg.end() ; ++it) {
-   	vTrash.push_back(it->first);
-   }
-   for(MContextNode::iterator it = mContextEnd.begin() ; it != mContextEnd.end() ; ++it) {
-   	vTrash.push_back(it->first);
-   }
-   for(MContextNode::iterator it = mNodesFI.begin() ; it != mNodesFI.end() ; ++it) {
-   	vTrash.push_back(it->first);
-   }
-   for(MContextV::iterator it = mContextBegV.begin() ; it != mContextBegV.end() ; ++it) {
-   	vTrash.push_back(it->first);
-   	for(vector< pair<unsigned char*,NodeTempX*> >::iterator jt = it->second.begin() ; jt != it->second.end(); ++jt) {
-   		vTrash.push_back(jt->first);
-   	}
-   }
-   for(MContextV::iterator it = mContextEndV.begin() ; it != mContextEndV.end() ; ++it) {
-   	vTrash.push_back(it->first);
-   	for(vector< pair<unsigned char*,NodeTempX*> >::iterator jt = it->second.begin() ; jt != it->second.end(); ++jt) {
-   		vTrash.push_back(jt->first);
-   	}
-   }
-   for(vector<unsigned char*>::iterator it = vTrash.begin() ; it != vTrash.end() ; ++it) {
-   	delete [] *it;
-   }
-	
+	pushWordLabels();
+	//print();
+
+	// Backward-merge
+	// note: two passes are typically necessary and enough, some FI-nodes merged in the first pass
+	//       enable merging of NULL-nodes in the second pass
+	mergeBackward();
+	//print();
+	mergeBackward();
+	//print();
+
+	// FI removal (FI-nodes, which were used to build the network are no longer necessary)
+	removeFINodes();
+	//print();
+	mergeForward();
+	mergeBackward();
+	print();
+
+	// build the language model look-ahead tree (needed to compute look-ahead scores)
+	m_iLANodes = -1;
+	m_iLATree = buildLMLookAheadTree(&m_iLANodes);
+
+	// clean-up
+	vector<unsigned char*> vTrash;
+	for(MContextBool::iterator it = mContextLeft.begin() ; it != mContextLeft.end() ; ++it) {
+		vTrash.push_back(it->first);
+	}
+	for(MContextBool::iterator it = mContextRight.begin() ; it != mContextRight.end() ; ++it) {
+		vTrash.push_back(it->first);
+	}
+	for(MContextNode::iterator it = mContextBeg.begin() ; it != mContextBeg.end() ; ++it) {
+		vTrash.push_back(it->first);
+	}
+	for(MContextNode::iterator it = mContextEnd.begin() ; it != mContextEnd.end() ; ++it) {
+		vTrash.push_back(it->first);
+	}
+	for(MContextNode::iterator it = mNodesFI.begin() ; it != mNodesFI.end() ; ++it) {
+		vTrash.push_back(it->first);
+	}
+	for(MContextV::iterator it = mContextBegV.begin() ; it != mContextBegV.end() ; ++it) {
+		vTrash.push_back(it->first);
+		for(vector< pair<unsigned char*,NodeTempX*> >::iterator jt = it->second.begin() ; jt != it->second.end(); ++jt) {
+			vTrash.push_back(jt->first);
+		}
+	}
+	for(MContextV::iterator it = mContextEndV.begin() ; it != mContextEndV.end() ; ++it) {
+		vTrash.push_back(it->first);
+		for(vector< pair<unsigned char*,NodeTempX*> >::iterator jt = it->second.begin() ; jt != it->second.end(); ++jt) {
+			vTrash.push_back(jt->first);
+		}
+	}
+	for(vector<unsigned char*>::iterator it = vTrash.begin() ; it != vTrash.end() ; ++it) {
+		delete [] *it;
+	}
+
 	DynamicNetworkX *dynamicNetwork = compact();
-   dynamicNetwork->setIP(fPhoneIP,iBasePhones);
-	
+	dynamicNetwork->setIP(fPhoneIP,iBasePhones);
+
 	double dTimeEnd = TimeUtils::getTimeMilliseconds();
 	double dTimeSeconds = (dTimeEnd-dTimeBegin)/1000.0;
-	
+
 	BVC_VERB << "building time: " << dTimeSeconds << " seconds";	
 
 	return dynamicNetwork;
@@ -946,14 +951,14 @@ void NetworkBuilderX::pushWordLabels() {
 		if (bShift == false) {
 			continue;
 		}
-		
+
 		vNodeWord.push_back(nodeAux);	
 	}
-	
+
 	// (2) shift each of the word arcs
 	int iShiftsTotal = 0;
 	for(VNodeTempX::iterator it = vNodeWord.begin() ; it != vNodeWord.end() ; ++it) {
-	
+
 		int iShifts = 0;
 		if ((*it)->lArcPrev.size() > 1) {
 			continue;
@@ -977,9 +982,9 @@ void NetworkBuilderX::pushWordLabels() {
 		//assert(arcReplace->nodeSource->lArcNext.size() == 1);
 		assert(arcReplace->nodeSource->iDepth >= m_iDepthMI);
 		iShiftsTotal += (int)(iShifts*(*it)->lArcNext.size());
-		
+
 		assert((*it)->iType == NODE_TYPE_HMM);
-		
+
 		// a NULL node needs to be created so a word-arc does not go to a hmm-arc 
 		// since we want to keep the hmm's in the arcs instead of in the nodes.
 		// the reason is to prevent cache-misses during token propagation
@@ -1030,7 +1035,7 @@ void NetworkBuilderX::pushWordLabels() {
 		(*it)->lArcNext.push_back(arcReplace);
 		nodeDest->lArcPrev.push_back(arcReplace);	
 	}
-	
+
 	BVC_VERB << "# shifts: " << iShiftsTotal;
 }
 
@@ -1069,11 +1074,11 @@ DynamicNetworkX *NetworkBuilderX::compact() {
 	int iArcsNull = 0;
 	int iArcsHMM = 0;
 	int iArcsWord = 0;
-	
+
 	// allocate memory
 	DNode *nodes = new DNode[iNodes+1];		// extra node is needed to mark the ending arc
 	DArc *arcs = new DArc[iArcs];
-	
+
 	// keep already created nodes (indexed by the corresponding temporal node id)
 	int *iNodeCreated = new int[m_iNodesTempID];
 	int *iFirstArc = new int[m_iNodesTempID];
@@ -1104,19 +1109,19 @@ DynamicNetworkX *NetworkBuilderX::compact() {
 			++iFOSeen;
 		}
 		switch((*it)->iType) {
-			case NODE_TYPE_FI: 
-			case NODE_TYPE_MI: 
-			case NODE_TYPE_FO: 
-			case NODE_TYPE_HMM:	
-			{
-				nodeAux->iType = NODE_TYPE_NULL;
-				break;
-			}
-			default: {
-				nodeAux->iType = (*it)->iType;	
-			}
+		case NODE_TYPE_FI:
+		case NODE_TYPE_MI:
+		case NODE_TYPE_FO:
+		case NODE_TYPE_HMM:
+		{
+			nodeAux->iType = NODE_TYPE_NULL;
+			break;
+		}
+		default: {
+			nodeAux->iType = (*it)->iType;
+		}
 		}	
-		
+
 		nodeAux->iDepth = (*it)->iDepth;
 		nodeAux->iIPIndex = (*it)->iIPIndex;
 		nodeAux->bWordEnd = (*it)->bWordEnd;
@@ -1156,7 +1161,7 @@ DynamicNetworkX *NetworkBuilderX::compact() {
 	assert(iArc == iArcs);
 	assert(iNode == iNodes);
 	nodes[iNodes].iArcNext = iArcs;
-	
+
 	// clean-up
 	for(VNodeTempX::iterator it = vNodesAll.begin() ; it != vNodesAll.end() ; ++it) {
 		for(LArcTempX::iterator jt = (*it)->lArcNext.begin() ; jt != (*it)->lArcNext.end() ; ++jt) {
@@ -1164,13 +1169,13 @@ DynamicNetworkX *NetworkBuilderX::compact() {
 		}
 		deleteNodeTempX(*it);
 	}	
-	
+
 	delete [] iNodeCreated;
 	delete [] iFirstArc;
-	
+
 	double dTimeEnd = TimeUtils::getTimeMilliseconds();
 	double dTimeSeconds = (dTimeEnd-dTimeBegin)/1000.0;		
-	
+
 	BVC_VERB << "- compacting summary ---------------------";
 	BVC_VERB << "# nodes:           " << setw(12) << iNodes;
 	BVC_VERB << "# arcs:            " << setw(12) << iArcs;
@@ -1209,15 +1214,15 @@ void NetworkBuilderX::mergeForward() {
 	int iNodesProcessed = 0;
 	int iNodesMerged = 0;
 	int iArcsMerged = 0;
-	
+
 	double dTimeBegin = TimeUtils::getTimeMilliseconds();	
-	
+
 	// allocate a structure to keep the node states	
 	unsigned char *iNodeState = new unsigned char[m_iNodesTempID];
 	for(int i=0 ; i<m_iNodesTempID ; ++i) {
 		iNodeState[i] = TEMPNODE_STATE_UNSEEN;
 	}	
-	
+
 	// start from the FI-nodes
 	LNodeTempX lNodes;
 	for(LArcTempX::iterator it = m_nodeTempRoot->lArcNext.begin() ; it != m_nodeTempRoot->lArcNext.end() ; ++it) {
@@ -1226,20 +1231,20 @@ void NetworkBuilderX::mergeForward() {
 	}	
 	//cout << "total: " << m_nodeTempRoot->lArcNext.size() << endl;
 	map<int,bool> mSeen;
-	
+
 	//lNodes.push_back(m_nodeTempRoot);
 	//iNodeState[m_nodeTempRoot->iNode] = TEMPNODE_STATE_QUEUED;
 	iNodeState[m_nodeTempRoot->iNode] = TEMPNODE_STATE_PROCESSED;
-	
+
 	// process all nodes
 	while(lNodes.empty() == false) {
-	
+
 		// get a node to process
 		NodeTempX *node = lNodes.front();
 		lNodes.pop_front();
 		iNodeState[node->iNode] = TEMPNODE_STATE_PROCESSED;
 		++iNodesProcessed;
-	
+
 		// look for equivalent arcs and merge them
 		for(LArcTempX::iterator it = node->lArcNext.begin() ; it != node->lArcNext.end() ; ++it) {
 			if ((*it)->nodeDest->iType == NODE_TYPE_FI) {
@@ -1249,7 +1254,7 @@ void NetworkBuilderX::mergeForward() {
 			jt++;
 			for( ; jt != node->lArcNext.end() ; ) {
 				if (equivalentNodes((*it)->nodeDest,(*jt)->nodeDest) && equivalentArcs(*it,*jt) 
-					&& samePredecessors((*it)->nodeDest,(*jt)->nodeDest)) {
+						&& samePredecessors((*it)->nodeDest,(*jt)->nodeDest)) {
 					// move successors from one arc to the other (if not already there)
 					for(LArcTempX::iterator kt = (*jt)->nodeDest->lArcNext.begin() ; kt != (*jt)->nodeDest->lArcNext.end() ; ++kt) {
 						bool bFound = false;
@@ -1308,7 +1313,7 @@ void NetworkBuilderX::mergeForward() {
 				}
 			}
 		}
-		
+
 		// put in the queue those successor nodes that have all their predecessors processed
 		for(LArcTempX::iterator it = node->lArcNext.begin() ; it != node->lArcNext.end() ; ++it) {
 			if (iNodeState[(*it)->nodeDest->iNode] != TEMPNODE_STATE_UNSEEN) {
@@ -1330,12 +1335,12 @@ void NetworkBuilderX::mergeForward() {
 			}
 		}
 	}	
-	
+
 	delete [] iNodeState;
-	
+
 	double dTimeEnd = TimeUtils::getTimeMilliseconds();
 	double dTimeSeconds = (dTimeEnd-dTimeBegin)/1000.0;		
-	
+
 	BVC_VERB << "- forward merging summary ----------------";
 	BVC_VERB << "# nodes processed: " << setw(12) << iNodesProcessed;
 	BVC_VERB << "# nodes merged:    " << setw(12) << iNodesMerged;
@@ -1348,12 +1353,12 @@ void NetworkBuilderX::mergeForward() {
 void NetworkBuilderX::removeMINodes(MContextNode &mContextBeg) {
 
 	for(MContextNode::iterator it = mContextBeg.begin() ; it != mContextBeg.end() ; ++it) {
-		
+
 		NodeTempX *nodeMI = it->second;
-		
+
 		// remove links to the MI-node
 		assert(nodeMI->lArcNext.empty());
-		
+
 		for(LArcTempX::iterator jt = nodeMI->lArcPrev.begin() ; jt != nodeMI->lArcPrev.end() ; ++jt) {
 			bool bFound = false;
 			for(LArcTempX::iterator kt = (*jt)->nodeSource->lArcNext.begin() ; kt != (*jt)->nodeSource->lArcNext.end() ; ) {
@@ -1368,7 +1373,7 @@ void NetworkBuilderX::removeMINodes(MContextNode &mContextBeg) {
 			}
 			assert(bFound);	
 		}
-				
+
 		deleteNodeTempX(nodeMI);
 	}
 }
@@ -1379,20 +1384,20 @@ void NetworkBuilderX::removeFINodes() {
 	int iNodesProcessed = 0;
 	int iNodesMerged = 0;
 	int iArcsMerged = 0;
-	
+
 	double dTimeBegin = TimeUtils::getTimeMilliseconds();	
-	
+
 	// get the FI-nodes
 	VNodeTempX vNodeFI;
 	for(LArcTempX::iterator it = m_nodeTempRoot->lArcNext.begin() ; it != m_nodeTempRoot->lArcNext.end() ; ++it) {
 		vNodeFI.push_back((*it)->nodeDest);
 	}
-	
+
 	// (1) remove FI-nodes
 	for(VNodeTempX::iterator it = vNodeFI.begin() ; it != vNodeFI.end() ; ++it) {
-		
+
 		NodeTempX *nodeFI = *it;
-		
+
 		// remove links coming from the FI-node
 		VNodeTempX vNodeDest;
 		for(LArcTempX::iterator jt = nodeFI->lArcNext.begin() ; jt != nodeFI->lArcNext.end() ; ) {
@@ -1433,7 +1438,7 @@ void NetworkBuilderX::removeFINodes() {
 			jt = nodeFI->lArcPrev.erase(jt);
 			deleteArcTempX(arcToDelete);
 		}
-			
+
 		// make direct connections
 		for(VNodeTempX::iterator it = vNodeSource.begin() ; it != vNodeSource.end() ; ++it) {
 			for(VNodeTempX::iterator jt = vNodeDest.begin() ; jt != vNodeDest.end() ; ++jt) {
@@ -1442,36 +1447,36 @@ void NetworkBuilderX::removeFINodes() {
 				}
 			}
 		}
-		
+
 		deleteNodeTempX(nodeFI);
 	}
-		
+
 	// get the auxiliar nodes
-	
+
 	// allocate a structure to keep the node states	
 	map<int,unsigned char*> mNodeState;
-	
+
 	// start from the root-node
 	/*LNodeTempX lNodes;
 	lNodes.push_back(m_nodeTempRoot);
-	
+
 	// process all nodes
 	while(lNodes.empty() == false) {
-	
+
 		// get a node to process
 		NodeTempX *node = lNodes.front();
 		lNodes.pop_front();
 		mNodeState[node->iNode] = TEMPNODE_STATE_PROCESSED;
 		++iNodesProcessed;
-	
+
 		// look for equivalent arcs and merge them
 		for(LArcTempX::iterator it = node->lArcNext.begin() ; it != node->lArcNext.end() ; ++it) {
-			
-			
-		
-		
+
+
+
+
 		}
-		
+
 		// put in the queue those successor nodes that have all their predecessors processed
 		for(LArcTempX::iterator it = node->lArcNext.begin() ; it != node->lArcNext.end() ; ++it) {
 			if ((iNodeState[(*it)->nodeDest->iNode] == TEMPNODE_STATE_QUEUED) || 
@@ -1495,12 +1500,12 @@ void NetworkBuilderX::removeFINodes() {
 		}
 
 	}	*/
-	
+
 	//delete [] iNodeState;
-	
+
 	double dTimeEnd = TimeUtils::getTimeMilliseconds();
 	double dTimeSeconds = (dTimeEnd-dTimeBegin)/1000.0;		
-	
+
 	BVC_VERB << "- removal summary ----------------";
 	BVC_VERB << "# nodes processed: " << iNodesProcessed;
 	BVC_VERB << "# nodes merged:    " << iNodesMerged;
@@ -1515,15 +1520,15 @@ void NetworkBuilderX::mergeBackward() {
 	int iNodesProcessed = 0;
 	int iNodesMerged = 0;
 	int iArcsMerged = 0;
-	
+
 	double dTimeBegin = TimeUtils::getTimeMilliseconds();
-	
+
 	// allocate a structure to keep the node states	
 	unsigned char *iNodeState = new unsigned char[m_iNodesTempID];
 	for(int i=0 ; i<m_iNodesTempID ; ++i) {
 		iNodeState[i] = TEMPNODE_STATE_UNSEEN;
 	}	
-	
+
 	// start from the FI-nodes
 	LNodeTempX lNodes;
 	for(LArcTempX::iterator it = m_nodeTempRoot->lArcNext.begin() ; it != m_nodeTempRoot->lArcNext.end() ; ++it) {
@@ -1531,23 +1536,23 @@ void NetworkBuilderX::mergeBackward() {
 		lNodes.push_back((*it)->nodeDest);
 		iNodeState[(*it)->nodeDest->iNode] = TEMPNODE_STATE_QUEUED;	
 	}
-	
+
 	// process all nodes
 	while(lNodes.empty() == false) {
-	
+
 		// get a node to process
 		NodeTempX *node = lNodes.front();
 		lNodes.pop_front();
 		iNodeState[node->iNode] = TEMPNODE_STATE_PROCESSED;
 		++iNodesProcessed;
-	
+
 		// look for equivalent arcs and merge them
 		for(LArcTempX::iterator it = node->lArcPrev.begin() ; it != node->lArcPrev.end() ; ++it) {
 			LArcTempX::iterator jt = it;
 			jt++;
 			for( ; jt != node->lArcPrev.end() ; ) {
 				if (equivalentNodes((*it)->nodeSource,(*jt)->nodeSource) && equivalentArcs(*it,*jt) && 
-					sameSuccessors((*it)->nodeSource,(*jt)->nodeSource)) {
+						sameSuccessors((*it)->nodeSource,(*jt)->nodeSource)) {
 					// move predecessors from one arc to the other (if not already there)
 					for(LArcTempX::iterator kt = (*jt)->nodeSource->lArcPrev.begin() ; kt != (*jt)->nodeSource->lArcPrev.end() ; ++kt) {
 						bool bFound = false;
@@ -1599,7 +1604,7 @@ void NetworkBuilderX::mergeBackward() {
 				}
 			}
 		}
-		
+
 		// put in the queue those predecessor nodes that have all their successors processed
 		for(LArcTempX::iterator it = node->lArcPrev.begin() ; it != node->lArcPrev.end() ; ++it) {
 			if (iNodeState[(*it)->nodeSource->iNode] != TEMPNODE_STATE_UNSEEN) {
@@ -1617,16 +1622,16 @@ void NetworkBuilderX::mergeBackward() {
 				iNodeState[(*it)->nodeSource->iNode] = TEMPNODE_STATE_QUEUED;
 			}
 		}
-			
+
 		//printf("queue: %12d nodes processed: %12d merged: %12d\n",lNodes.size(),iNodesProcessed,iNodesMerged);
 	}	
 
-	
+
 	delete [] iNodeState;
-	
+
 	double dTimeEnd = TimeUtils::getTimeMilliseconds();
 	double dTimeSeconds = (dTimeEnd-dTimeBegin)/1000.0;		
-	
+
 	BVC_VERB << "- backward merging summary ---------------";
 	BVC_VERB << "# nodes processed: " << iNodesProcessed;
 	BVC_VERB << "# nodes merged:    " << iNodesMerged;
@@ -1640,9 +1645,9 @@ void NetworkBuilderX::mergeBackwardMI(VNodeTempX &vNodeTempMI, NodeMergeInfo *fi
 	int iNodesProcessed = 0;
 	int iNodesMerged = 0;
 	int iArcsMerged = 0;
-	
+
 	//double dTimeBegin = TimeUtils::getTimeMilliseconds();
-	
+
 	// allocate a structure to keep the node states	
 	//unsigned char *iNodeState = new unsigned char[m_iNodesTemp];
 	//for(int i=0 ; i<m_iNodesTemp ; ++i) {
@@ -1650,7 +1655,7 @@ void NetworkBuilderX::mergeBackwardMI(VNodeTempX &vNodeTempMI, NodeMergeInfo *fi
 	for(int i=0 ; i<m_iNodesTempID ; ++i) {
 		iNodeState[i] = TEMPNODE_STATE_UNSEEN;
 	}	
-	
+
 	// start from the MI-nodes
 	LNodeTempX lNodes;
 	for(VNodeTempX::iterator it = vNodeTempMI.begin() ; it != vNodeTempMI.end() ; ++it) {
@@ -1658,16 +1663,16 @@ void NetworkBuilderX::mergeBackwardMI(VNodeTempX &vNodeTempMI, NodeMergeInfo *fi
 		lNodes.push_back(*it);
 		iNodeState[(*it)->iNode] = TEMPNODE_STATE_QUEUED;	
 	}
-	
+
 	// process all nodes
 	while(lNodes.empty() == false) {
-	
+
 		// get a node to process
 		NodeTempX *node = lNodes.front();
 		lNodes.pop_front();
 		iNodeState[node->iNode] = TEMPNODE_STATE_PROCESSED;
 		++iNodesProcessed;
-	
+
 		// look for equivalent arcs and merge them
 		for(LArcTempX::iterator it = node->lArcPrev.begin() ; it != node->lArcPrev.end() ; ++it) {
 			LArcTempX::iterator jt = it;
@@ -1726,12 +1731,12 @@ void NetworkBuilderX::mergeBackwardMI(VNodeTempX &vNodeTempMI, NodeMergeInfo *fi
 				}
 			}
 		}
-		
+
 		// do not add FI-nodes to the queue
 		if (node->iDepth == 1) {
 			continue;
 		}
-		
+
 		// put in the queue those predecessor nodes that have all their successors processed
 		for(LArcTempX::iterator it = node->lArcPrev.begin() ; it != node->lArcPrev.end() ; ++it) {
 			if (iNodeState[(*it)->nodeSource->iNode] != TEMPNODE_STATE_UNSEEN) {
@@ -1749,15 +1754,15 @@ void NetworkBuilderX::mergeBackwardMI(VNodeTempX &vNodeTempMI, NodeMergeInfo *fi
 				iNodeState[(*it)->nodeSource->iNode] = TEMPNODE_STATE_QUEUED;
 			}
 		}
-			
+
 		//printf("queue: %12d nodes processed: %12d merged: %12d\n",lNodes.size(),iNodesProcessed,iNodesMerged);
 	}	
-	
+
 	delete [] iNodeState;
-	
+
 	//double dTimeEnd = TimeUtils::getTimeMilliseconds();
 	//double dTimeSeconds = (dTimeEnd-dTimeBegin)/1000.0;		
-	
+
 	/*printf("- backward merging summary ---------------\n");
 	printf("# nodes processed: %12d\n",iNodesProcessed);
 	printf("# nodes merged:    %12d\n",iNodesMerged);
@@ -1771,9 +1776,9 @@ void NetworkBuilderX::mergeBackwardFI(VNodeTempX &vNodeTempFI, NodeMergeInfo *fo
 	int iNodesProcessed = 0;
 	int iNodesMerged = 0;
 	int iArcsMerged = 0;
-	
+
 	double dTimeBegin = TimeUtils::getTimeMilliseconds();
-	
+
 	// allocate a structure to keep the node states	
 	//unsigned char *iNodeState = new unsigned char[10*m_iNodesTemp];
 	//for(int i=0 ; i<10*m_iNodesTemp ; ++i) {
@@ -1781,7 +1786,7 @@ void NetworkBuilderX::mergeBackwardFI(VNodeTempX &vNodeTempFI, NodeMergeInfo *fo
 	for(int i=0 ; i<m_iNodesTempID ; ++i) {
 		iNodeState[i] = TEMPNODE_STATE_UNSEEN;
 	}	
-	
+
 	// start from the MI-nodes
 	LNodeTempX lNodes;
 	for(VNodeTempX::iterator it = vNodeTempFI.begin() ; it != vNodeTempFI.end() ; ++it) {
@@ -1789,16 +1794,16 @@ void NetworkBuilderX::mergeBackwardFI(VNodeTempX &vNodeTempFI, NodeMergeInfo *fo
 		lNodes.push_back(*it);
 		iNodeState[(*it)->iNode] = TEMPNODE_STATE_QUEUED;	
 	}
-	
+
 	// process all nodes
 	while(lNodes.empty() == false) {
-	
+
 		// get a node to process
 		NodeTempX *node = lNodes.front();
 		lNodes.pop_front();
 		iNodeState[node->iNode] = TEMPNODE_STATE_PROCESSED;
 		++iNodesProcessed;
-	
+
 		// look for equivalent arcs and merge them
 		for(LArcTempX::iterator it = node->lArcPrev.begin() ; it != node->lArcPrev.end() ; ++it) {
 			LArcTempX::iterator jt = it;
@@ -1858,12 +1863,12 @@ void NetworkBuilderX::mergeBackwardFI(VNodeTempX &vNodeTempFI, NodeMergeInfo *fo
 				}
 			}
 		}
-		
+
 		// do not add FI-nodes to the queue
 		if (node->iType == NODE_TYPE_FO) {
 			continue;
 		}
-		
+
 		// put in the queue those predecessor nodes that have all their successors processed
 		for(LArcTempX::iterator it = node->lArcPrev.begin() ; it != node->lArcPrev.end() ; ++it) {
 			if (iNodeState[(*it)->nodeSource->iNode] != TEMPNODE_STATE_UNSEEN) {
@@ -1881,15 +1886,15 @@ void NetworkBuilderX::mergeBackwardFI(VNodeTempX &vNodeTempFI, NodeMergeInfo *fo
 				iNodeState[(*it)->nodeSource->iNode] = TEMPNODE_STATE_QUEUED;
 			}
 		}
-			
+
 		//printf("queue: %12d nodes processed: %12d merged: %12d\n",lNodes.size(),iNodesProcessed,iNodesMerged);
 	}	
-	
+
 	delete [] iNodeState;
-	
+
 	double dTimeEnd = TimeUtils::getTimeMilliseconds();
 	double dTimeSeconds = (dTimeEnd-dTimeBegin)/1000.0;		
-	
+
 	BVC_VERB << "- backward merging summary ---------------";
 	BVC_VERB << "# nodes processed: " << iNodesProcessed;
 	BVC_VERB << "# nodes merged:    " << iNodesMerged;
@@ -1903,9 +1908,9 @@ void NetworkBuilderX::mergeBackwardWordNodes(VNodeTempX &vNodeWord) {
 	int iNodesProcessed = 0;
 	int iNodesMerged = 0;
 	int iArcsMerged = 0;
-	
+
 	double dTimeBegin = TimeUtils::getTimeMilliseconds();
-	
+
 	// allocate a structure to keep the node states	
 	//unsigned char *iNodeState = new unsigned char[m_iNodesTemp];
 	//for(int i=0 ; i<m_iNodesTemp ; ++i) {
@@ -1913,7 +1918,7 @@ void NetworkBuilderX::mergeBackwardWordNodes(VNodeTempX &vNodeWord) {
 	for(int i=0 ; i<m_iNodesTempID ; ++i) {
 		iNodeState[i] = TEMPNODE_STATE_UNSEEN;
 	}	
-	
+
 	// start from the word-nodes
 	LNodeTempX lNodes;
 	for(VNodeTempX::iterator it = vNodeWord.begin() ; it != vNodeWord.end() ; ++it) {
@@ -1921,16 +1926,16 @@ void NetworkBuilderX::mergeBackwardWordNodes(VNodeTempX &vNodeWord) {
 		lNodes.push_back(*it);
 		iNodeState[(*it)->iNode] = TEMPNODE_STATE_QUEUED;	
 	}
-	
+
 	// process all nodes
 	while(lNodes.empty() == false) {
-	
+
 		// get a node to process
 		NodeTempX *node = lNodes.front();
 		lNodes.pop_front();
 		iNodeState[node->iNode] = TEMPNODE_STATE_PROCESSED;
 		++iNodesProcessed;
-	
+
 		// look for equivalent arcs and merge them
 		for(LArcTempX::iterator it = node->lArcPrev.begin() ; it != node->lArcPrev.end() ; ++it) {
 			LArcTempX::iterator jt = it;
@@ -1988,12 +1993,12 @@ void NetworkBuilderX::mergeBackwardWordNodes(VNodeTempX &vNodeWord) {
 				}
 			}
 		}
-		
+
 		// do not add FI-nodes to the queue
 		if (node->iDepth == 3) {
 			continue;
 		}
-		
+
 		// put in the queue those predecessor nodes that have all their successors processed
 		for(LArcTempX::iterator it = node->lArcPrev.begin() ; it != node->lArcPrev.end() ; ++it) {
 			if (iNodeState[(*it)->nodeSource->iNode] != TEMPNODE_STATE_UNSEEN) {
@@ -2011,15 +2016,15 @@ void NetworkBuilderX::mergeBackwardWordNodes(VNodeTempX &vNodeWord) {
 				iNodeState[(*it)->nodeSource->iNode] = TEMPNODE_STATE_QUEUED;
 			}
 		}
-			
+
 		//printf("queue: %12d nodes processed: %12d merged: %12d\n",lNodes.size(),iNodesProcessed,iNodesMerged);
 	}	
-	
+
 	delete [] iNodeState;
-	
+
 	double dTimeEnd = TimeUtils::getTimeMilliseconds();
 	double dTimeSeconds = (dTimeEnd-dTimeBegin)/1000.0;		
-	
+
 	BVC_VERB << "- backward merging summary ---------------";
 	BVC_VERB << "# nodes processed: " << iNodesProcessed;
 	BVC_VERB << "# nodes merged:    " << iNodesMerged;
@@ -2036,13 +2041,13 @@ int *NetworkBuilderX::buildLMLookAheadTree(int *iNodes) {
 	/*word-arcs have been moved to the head of the network during puhsWordLabels, however they are always placed after
 	 the first HMM-model (first three HMM-states). Collect all the word arcs and make sure there
 	is at least one arc per word in the vocabulary. If the vocabulary size is V, then there must 
-	
+
 	- each node within the network should have an integer with the LMLA element in the LMLA-tree (which in
 	 reality is a topologically sorted array). When a word-arc is accessed then the index within the LMLA-tree can 
 	 be the lexical-unit-id, sometimes 
-	
+
 	two goals:
-	
+
 	a) efficient copy of lm-scores from n-gram tables to lm-context-dependent-lmla-tree, the arcs in the LM-state
 	are sorted by lexUnitId (check this), just use the lex-unit-id to copy the score scores[lexUnitId] = score, first for the deepest backoff, last is the higher ngrams.*/
 
@@ -2072,9 +2077,9 @@ int *NetworkBuilderX::buildLMLookAheadTree(int *iNodes) {
 			++iArcsInitialized;
 		}
 	}
-	
+
 	BVC_VERB << "arcs initialized: " << iArcsInitialized;
-	
+
 	// (2) traverse the graph backwards starting at the word-arcs	
 	// tree traversal is breadth-first so look-ahead indices are topologically sorted
 	int iLANode = 0;
@@ -2140,7 +2145,7 @@ int *NetworkBuilderX::buildLMLookAheadTree(int *iNodes) {
 	for(map<int,int>::iterator it = mPredecessor.begin() ; it != mPredecessor.end() ; ++it) {
 		iLATree[it->first] = it->second;
 	}
-	
+
 	// check
 	int *iCheck = new int[iLANode];
 	for(int i=0 ; i < iLANode ; ++i) {
@@ -2156,13 +2161,13 @@ int *NetworkBuilderX::buildLMLookAheadTree(int *iNodes) {
 		assert(iCheck[i] != -1);
 	}
 	delete [] iCheck;
-	
+
 	BVC_VERB << "predecessors: " << mPredecessor.size();
 	BVC_VERB << "arcs processed: " << iArcsProcessed;
-	
+
 	double dTimeEnd = TimeUtils::getTimeMilliseconds();
 	double dTimeSeconds = (dTimeEnd-dTimeBegin)/1000.0;		
-	
+
 	BVC_VERB << "-- building look-ahead tree --------------------------";
 	BVC_VERB << "# word arcs:     " << vArcWord.size() << " (words in vocabulary)";
 	BVC_VERB << "processing time: " << dTimeSeconds << " seconds";	

@@ -522,7 +522,9 @@ bool Viterbi::align(float *fFeatures, int iFeatures, HypothesisLattice *hypothes
 	// the cache is needed since we align different lexical units against the same segment of features
 	useCache(true);
 	//useCache(false);
+	printf("Viterbi.cpp: allocating cache... ");
 	allocateCache(iFeatures);
+	printf("done.\n");
 
 	// reset the score cache
 	m_fScoreCache = NULL;	
@@ -594,9 +596,11 @@ void Viterbi::allocateCache(int iFeatures) {
 
 	m_iHMMStatesPhysical = m_hmmManager->getNumberHMMStatesPhysical();
 	int iEntriesNeeded = iFeatures*m_iHMMStatesPhysical;
+	printf("entries needed = %d\n", iEntriesNeeded);
 
 	// (1) try to reuse an old cache
 	if (m_iEntriesCacheOld >= iEntriesNeeded) {
+		printf("reuse old\n");
 		assert(m_fScoreCacheOld != NULL);
 		m_fScoreCache = m_fScoreCacheOld;
 		for(int i=0 ; i<iEntriesNeeded ; ++i) {
@@ -605,6 +609,7 @@ void Viterbi::allocateCache(int iFeatures) {
 	}
 	// (2) create a brand new cache
 	else {
+		printf("create a new cache\n");
 		m_fScoreCache = new float[iEntriesNeeded];
 		for(int i=0 ; i<iEntriesNeeded ; ++i) {
 			m_fScoreCache[i] = FLT_MAX;

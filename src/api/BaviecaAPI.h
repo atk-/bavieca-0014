@@ -21,14 +21,33 @@
 
 using namespace std;
 
+#include "Alignment.h"
+#include "BestPath.h"
 #include <string>
 #include <vector>
 
 #include <stdlib.h>
 #include <assert.h>
+#include <stdio.h>
+
+#ifdef __cplusplus
+extern "C" {
+#ifdef BUILDDLL
+	#define ADDAPI __declspec(dllexport)
+#else
+	#define ADDAPI __declspec(dllimport)
+#endif
+
+#define ADDCALL __stdcall
+#else
+//defined __linux__ || defined __APPLE__ || defined SWIG
+	#define ADDAPI
+	#define ADDCALL
+#endif
 
 namespace Bavieca {
 
+class Alignment;
 class BestPath;
 class ConfigurationBavieca;
 class DynamicDecoderX;
@@ -38,6 +57,7 @@ class FeatureTransformList;
 class FileUtils;
 class FillerManager;
 class HMMManager;
+class HypothesisLattice;
 class LexiconManager;
 class LMManager;
 class NetworkBuilderX;
@@ -67,11 +87,71 @@ class SpeechSegmentsI;
 	@author daniel <dani.bolanos@gmail.com>
 */
 
-#ifdef _WIN32
-class extern "C" __declspec(dllexport) BaviecaAPI {
-#elif defined __linux__ || defined __APPLE__ || defined SWIG
+class WordHypothesisI {
+
+	private:
+
+		string m_strWord;
+		int m_iFrameStart;
+		int m_iFrameEnd;
+
+	public:
+
+		WordHypothesisI(const char *strWord, int iFrameStart, int iFrameEnd) {
+
+			m_strWord = (strWord) ? strWord : "";
+			m_iFrameStart = iFrameStart;
+			m_iFrameEnd = iFrameEnd;
+		}
+
+		~WordHypothesisI() {
+		}
+
+		const char *getWord() {
+			return m_strWord.c_str();
+		}
+		int getFrameStart() {
+			return m_iFrameStart;
+		}
+		int getFrameEnd() {
+			return m_iFrameEnd;
+		}
+};
+
+class HypothesisI {
+
+	friend class BaviecaAPI;
+
+	private:
+
+		vector<WordHypothesisI*> m_vWordHypothesisI;
+
+	public:
+
+		HypothesisI(vector<WordHypothesisI*> &vWordHypothesisI) {
+			m_vWordHypothesisI.assign(vWordHypothesisI.begin(),vWordHypothesisI.end());
+		}
+
+		~HypothesisI() {
+			for(vector<WordHypothesisI*>::iterator it = m_vWordHypothesisI.begin() ; it != m_vWordHypothesisI.end() ; ++it) {
+				delete *it;
+			}
+			m_vWordHypothesisI.clear();
+		}
+
+		unsigned int size() {
+			return (unsigned int)m_vWordHypothesisI.size();
+		}
+
+		WordHypothesisI *getWordHypothesis(unsigned int iWord) {
+			if (iWord < size()) {
+				return m_vWordHypothesisI[iWord];
+			}
+			return NULL;
+		}
+};
+
 class BaviecaAPI {
-#endif
 
 	private:
 	
@@ -95,73 +175,131 @@ class BaviecaAPI {
 	public:
 
 		// constructor (receives default configuration parameters)
-		BaviecaAPI(const char *strFileConfiguration);
+		ADDAPI BaviecaAPI(const char *strFileConfiguration);
 
 		// destructor
-		~BaviecaAPI();
+		ADDAPI ~BaviecaAPI();
+
+//		ADDAPI static const char* ADDCALL foo(const char* const* values, unsigned int vsize) {
+//			printf("foo() called with vector size %d\n", vsize);
+//			std::vector<std::string> v(values, values + vsize);
+////			std::vector<WordHypothesisI*> *vhyp = new std::vector<WordHypothesisI*>();
+//			const char* ret[3];
+//
+//			for ( unsigned int i=0; i < vsize; i++ ) {
+//				printf("%s\n", v[i].c_str());
+//				//vhyp->push_back(new WordHypothesisI(v[i].c_str(), i, i+1));
+//				//ret->push_back(std::string(v[i].rbegin(), v[i].rend()).c_str());
+//				//ret->push_back(v[i]);
+//				ret[i] = v[i].c_str();
+//			}
+//
+////			HypothesisI* ret = new HypothesisI(*vhyp);
+//			return *ret;
+//		}
 		
+		static void bar(const char* str) {
+			printf("api says '%s'\n", str);
+		}
+
+		// factory method
+		ADDAPI static BaviecaAPI* ADDCALL create(const char *configFile, unsigned char iFlags, ParamValuesI *paramValues = NULL, int paramCount = 0);
+
 		// API INITIALIZATION ------------------------------------------------------------------------------------
 		
 		// initialize API (overriding parameters as needed)
-		bool initialize(unsigned char iFlags, ParamValuesI *paramValues = NULL);
+		ADDAPI bool ADDCALL initialize(unsigned char iFlags, ParamValuesI *paramValues = NULL, unsigned int paramCount = 0);
 		
 		// uninitialize the API	
-		void uninitialize();
+		ADDAPI void ADDCALL uninitialize();
 		
 		// FEATURE EXTRACTION -------------------------------------------------------------------------------------
+		ADDAPI float ADDCALL *extractFeatures(const char* wavFile, unsigned int* iFeatures);
 		
 		// extract features from the audio
-		float *extractFeatures(short *sSamples, unsigned int iSamples, unsigned int *iFeatures);
+		ADDAPI float ADDCALL *extractFeatures(short *sSamples, unsigned int iSamples, unsigned int *iFeatures);
 		
 		// return feature dimensionality
-		int getFeatureDim();
+		ADDAPI int ADDCALL getFeatureDim();
 		
 		// free features extracted using extractFeatures(...)
-		void free(float *fFeatures);
+		ADDAPI void ADDCALL free(float *fFeatures);
 		
 		// SPEECH ACTIVITY DETECTION ------------------------------------------------------------------------------
 		
 		// start a SAD session
-		void sadBeginSession();
+		ADDAPI void ADDCALL sadBeginSession();
 		
 		// terminate a SAD session
-		void sadEndSession();
+		ADDAPI void ADDCALL sadEndSession();
 		
 		// proces the given features
-		void sadFeed(float *fFeatures, unsigned int iFeatures);
+		ADDAPI void ADDCALL sadFeed(float *fFeatures, unsigned int iFeatures);
 		
 		// recover speech segments by doing back-tracking on the grid
-		SpeechSegmentsI *sadRecoverSpeechSegments();	
+		ADDAPI SpeechSegmentsI ADDCALL *sadRecoverSpeechSegments();
 		
 		// FORCED ALIGNMENT --------------------------------------------------------------------------------------
 		
 		// forced alignment between features and audio
-		AlignmentI *align(float *fFeatures, unsigned int iFeatures, const char *strText, bool bMultiplePronunciations);
-			
+		ADDAPI Alignment ADDCALL *align(float *fFeatures, unsigned int iFeatures, const char *strText, bool bMultiplePronunciations);
+
+		ADDAPI AlignmentI ADDCALL *alignI(float *fFeatures, unsigned int iFeatures, const char *strText,
+			bool bMultiplePronunciations);
+
+		ADDAPI Alignment ADDCALL *alignFile(const char *featureFile, const char *strText, const char *alignmentFile);
+
 		// DECODING ----------------------------------------------------------------------------------------------
 		
 		// signals beginning of utterance
-		void decBeginUtterance();
+		ADDAPI void ADDCALL decBeginUtterance();
 		
 		// process feature vectors from an utterance
-		void decProcess(float *fFeatures, unsigned int iFeatures);
+		ADDAPI void ADDCALL decProcess(float *fFeatures, unsigned int iFeatures);
 		
 		// get decoding results
-		HypothesisI *decGetHypothesis(const char *strFileHypothesisLattice = NULL);
+		ADDAPI HypothesisI ADDCALL *decGetHypothesis(const char *strFileHypothesisLattice = NULL);
 		
 		// signals end of utterance
-		void decEndUtterance();
+		ADDAPI void ADDCALL decEndUtterance();
 		
 		// return a word-level assessment given a hypothesis and a reference text
-		TextAlignmentI *getAssessment(HypothesisI *hypothesis, const char *strReference);
+		ADDAPI TextAlignmentI ADDCALL *getAssessment(HypothesisI *hypothesis, const char *strReference);
 				
 		// SPEAKER ADAPTATION ------------------------------------------------------------------------------------
 		
 		// feed data into speaker adaptation
-		void mllrFeed(const char *strReference, float *fFeatures, unsigned int iFeatures);
+		ADDAPI void ADDCALL mllrFeed(const char *strReference, float *fFeatures, unsigned int iFeatures);
 		
 		// adapt current acoustic models using fed adaptation data
-		void mllrAdapt();
+		ADDAPI void ADDCALL mllrAdapt();
+
+		// LATTICE TOOLS -----------------------------------------------------------------------------------------
+
+		// add a new path into the lattice
+		ADDAPI void ADDCALL addPathToLattice(HypothesisLattice *lattice, const char *featureFile, const char *alignmentFile, bool isBest);
+
+		// rescore the lattice (lattice is recreated by the decoder)
+		ADDAPI void ADDCALL rescore(float amScore, float lmScore);
+
+		// rescore the given lattice
+		ADDAPI BestPath* ADDCALL rescoreLattice(HypothesisLattice *lattice, float amFactor, float lmFactor);
+
+		// attach LM values
+		ADDAPI void ADDCALL attachLM(HypothesisLattice *lattice);
+
+		// attach AM values
+		ADDAPI void ADDCALL attachAM(HypothesisLattice *lattice, const char *strFeatureFile);
+		ADDAPI void ADDCALL attachAM(HypothesisLattice *lattice, float *fFeatures, unsigned int iFeatures);
+
+		// compute posterior probabilities
+		ADDAPI void ADDCALL computePP(HypothesisLattice *lattice);
+
+		ADDAPI HypothesisLattice* ADDCALL getHypothesisLattice();
+
+		ADDAPI void ADDCALL storeLatticeAsText(HypothesisLattice *lattice, const char *filename);
+
+		ADDAPI void ADDCALL alignReferenceText(HypothesisLattice *lattice, const char *refText);
 
 };
 
@@ -226,6 +364,8 @@ class SpeechSegmentsI {
 // configuration parameters (for overriding)
 class ParamValueI {
 
+	friend class BaviecaAPI;
+
 	private:
 	
 		string m_strParameter;
@@ -256,11 +396,10 @@ class ParamValuesI {
 
 		vector<ParamValueI*> m_vParamValuesI;
 
+	public:
 		ParamValuesI(vector<ParamValueI*> &vParamValuesI) {			
 			m_vParamValuesI.assign(vParamValuesI.begin(),vParamValuesI.end());
 		}
-
-	public:
 
 		~ParamValuesI() {
 			for(vector<ParamValueI*>::iterator it = m_vParamValuesI.begin() ; it != m_vParamValuesI.end() ; ++it) {
@@ -276,70 +415,6 @@ class ParamValuesI {
 		ParamValueI *getParamValue(unsigned int i) {
 			if (i < size()) {
 				return m_vParamValuesI[i];
-			}
-			return NULL;
-		}
-};
-
-class WordHypothesisI {
-
-	private:
-
-		string m_strWord;
-		int m_iFrameStart;
-		int m_iFrameEnd;
-
-	public:
-
-		WordHypothesisI(const char *strWord, int iFrameStart, int iFrameEnd) {
-
-			m_strWord = (strWord) ? strWord : "";
-			m_iFrameStart = iFrameStart;
-			m_iFrameEnd = iFrameEnd;
-		}
-
-		~WordHypothesisI() {
-		}
-
-		const char *getWord() {
-			return m_strWord.c_str();
-		}
-		int getFrameStart() {
-			return m_iFrameStart;
-		}
-		int getFrameEnd() {
-			return m_iFrameEnd;
-		}
-};
-
-class HypothesisI {
-
-	friend class BaviecaAPI;
-
-	private: 
-
-		vector<WordHypothesisI*> m_vWordHypothesisI;
-
-		HypothesisI(vector<WordHypothesisI*> &vWordHypothesisI) {			
-			m_vWordHypothesisI.assign(vWordHypothesisI.begin(),vWordHypothesisI.end());
-		}
-
-	public:
-
-		~HypothesisI() {
-			for(vector<WordHypothesisI*>::iterator it = m_vWordHypothesisI.begin() ; it != m_vWordHypothesisI.end() ; ++it) {
-				delete *it;
-			}
-			m_vWordHypothesisI.clear();
-		}
-
-		unsigned int size() {
-			return (unsigned int)m_vWordHypothesisI.size();
-		}
-	
-		WordHypothesisI *getWordHypothesis(unsigned int iWord) {
-			if (iWord < size()) {
-				return m_vWordHypothesisI[iWord];
 			}
 			return NULL;
 		}
@@ -533,3 +608,6 @@ class TextAlignmentI {
 
 #endif
 
+#ifdef __cplusplus
+}
+#endif

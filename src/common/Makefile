@@ -132,13 +132,3 @@ $(OBJ_DIR)/wfsabuilder/%.o: $(SRC_DIR)/wfsabuilder/%.cpp
 
 $(OBJ_DIR)/wfsadecoder/%.o: $(SRC_DIR)/wfsadecoder/%.cpp
 	$(XCC) $(CPPFLAGS_) $(INC) -c $< -o $@
-
-
-
-
-
-
-
-
-
-

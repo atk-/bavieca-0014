@@ -1,0 +1,133 @@
+EXPORTS
+    _ZN7Bavieca10BaviecaAPI10decProcessEPfj = _ZN7Bavieca10BaviecaAPI10decProcessEPfj@12 @1
+    _ZN7Bavieca10BaviecaAPI10decProcessEPfj@12 @2
+    _ZN7Bavieca10BaviecaAPI10initializeEhPNS_12ParamValuesIEj = _ZN7Bavieca10BaviecaAPI10initializeEhPNS_12ParamValuesIEj@16 @3
+    _ZN7Bavieca10BaviecaAPI10initializeEhPNS_12ParamValuesIEj@16 @4
+    _ZN7Bavieca10BaviecaAPI12uninitializeEv = _ZN7Bavieca10BaviecaAPI12uninitializeEv@4 @5
+    _ZN7Bavieca10BaviecaAPI12uninitializeEv@4 @6
+    _ZN7Bavieca10BaviecaAPI13getAssessmentEPNS_11HypothesisIEPKc = _ZN7Bavieca10BaviecaAPI13getAssessmentEPNS_11HypothesisIEPKc@12 @7
+    _ZN7Bavieca10BaviecaAPI13getAssessmentEPNS_11HypothesisIEPKc@12 @8
+    _ZN7Bavieca10BaviecaAPI13getFeatureDimEv = _ZN7Bavieca10BaviecaAPI13getFeatureDimEv@4 @9
+    _ZN7Bavieca10BaviecaAPI13getFeatureDimEv@4 @10
+    _ZN7Bavieca10BaviecaAPI13sadEndSessionEv = _ZN7Bavieca10BaviecaAPI13sadEndSessionEv@4 @11
+    _ZN7Bavieca10BaviecaAPI13sadEndSessionEv@4 @12
+    _ZN7Bavieca10BaviecaAPI14rescoreLatticeEPNS_17HypothesisLatticeEff = _ZN7Bavieca10BaviecaAPI14rescoreLatticeEPNS_17HypothesisLatticeEff@16 @13
+    _ZN7Bavieca10BaviecaAPI14rescoreLatticeEPNS_17HypothesisLatticeEff@16 @14
+    _ZN7Bavieca10BaviecaAPI15decEndUtteranceEv = _ZN7Bavieca10BaviecaAPI15decEndUtteranceEv@4 @15
+    _ZN7Bavieca10BaviecaAPI15decEndUtteranceEv@4 @16
+    _ZN7Bavieca10BaviecaAPI15extractFeaturesEPKcPj = _ZN7Bavieca10BaviecaAPI15extractFeaturesEPKcPj@12 @17
+    _ZN7Bavieca10BaviecaAPI15extractFeaturesEPKcPj@12 @18
+    _ZN7Bavieca10BaviecaAPI15extractFeaturesEPsjPj = _ZN7Bavieca10BaviecaAPI15extractFeaturesEPsjPj@16 @19
+    _ZN7Bavieca10BaviecaAPI15extractFeaturesEPsjPj@16 @20
+    _ZN7Bavieca10BaviecaAPI15sadBeginSessionEv = _ZN7Bavieca10BaviecaAPI15sadBeginSessionEv@4 @21
+    _ZN7Bavieca10BaviecaAPI15sadBeginSessionEv@4 @22
+    _ZN7Bavieca10BaviecaAPI16addPathToLatticeEPNS_17HypothesisLatticeEPKcS4_b = _ZN7Bavieca10BaviecaAPI16addPathToLatticeEPNS_17HypothesisLatticeEPKcS4_b@20 @23
+    _ZN7Bavieca10BaviecaAPI16addPathToLatticeEPNS_17HypothesisLatticeEPKcS4_b@20 @24
+    _ZN7Bavieca10BaviecaAPI16decGetHypothesisEPKc = _ZN7Bavieca10BaviecaAPI16decGetHypothesisEPKc@8 @25
+    _ZN7Bavieca10BaviecaAPI16decGetHypothesisEPKc@8 @26
+    _ZN7Bavieca10BaviecaAPI17decBeginUtteranceEv = _ZN7Bavieca10BaviecaAPI17decBeginUtteranceEv@4 @27
+    _ZN7Bavieca10BaviecaAPI17decBeginUtteranceEv@4 @28
+    _ZN7Bavieca10BaviecaAPI18alignReferenceTextEPNS_17HypothesisLatticeEPKc = _ZN7Bavieca10BaviecaAPI18alignReferenceTextEPNS_17HypothesisLatticeEPKc@12 @29
+    _ZN7Bavieca10BaviecaAPI18alignReferenceTextEPNS_17HypothesisLatticeEPKc@12 @30
+    _ZN7Bavieca10BaviecaAPI18storeLatticeAsTextEPNS_17HypothesisLatticeEPKc = _ZN7Bavieca10BaviecaAPI18storeLatticeAsTextEPNS_17HypothesisLatticeEPKc@12 @31
+    _ZN7Bavieca10BaviecaAPI18storeLatticeAsTextEPNS_17HypothesisLatticeEPKc@12 @32
+    _ZN7Bavieca10BaviecaAPI20getHypothesisLatticeEv = _ZN7Bavieca10BaviecaAPI20getHypothesisLatticeEv@4 @33
+    _ZN7Bavieca10BaviecaAPI20getHypothesisLatticeEv@4 @34
+    _ZN7Bavieca10BaviecaAPI24sadRecoverSpeechSegmentsEv = _ZN7Bavieca10BaviecaAPI24sadRecoverSpeechSegmentsEv@4 @35
+    _ZN7Bavieca10BaviecaAPI24sadRecoverSpeechSegmentsEv@4 @36
+    _ZN7Bavieca10BaviecaAPI4freeEPf = _ZN7Bavieca10BaviecaAPI4freeEPf@8 @37
+    _ZN7Bavieca10BaviecaAPI4freeEPf@8 @38
+    _ZN7Bavieca10BaviecaAPI5alignEPfjPKcb = _ZN7Bavieca10BaviecaAPI5alignEPfjPKcb@20 @39
+    _ZN7Bavieca10BaviecaAPI5alignEPfjPKcb@20 @40
+    _ZN7Bavieca10BaviecaAPI6alignIEPfjPKcb = _ZN7Bavieca10BaviecaAPI6alignIEPfjPKcb@20 @41
+    _ZN7Bavieca10BaviecaAPI6alignIEPfjPKcb@20 @42
+    _ZN7Bavieca10BaviecaAPI6createEPKchPNS_12ParamValuesIEi = _ZN7Bavieca10BaviecaAPI6createEPKchPNS_12ParamValuesIEi@16 @43
+    _ZN7Bavieca10BaviecaAPI6createEPKchPNS_12ParamValuesIEi@16 @44
+    _ZN7Bavieca10BaviecaAPI7rescoreEff = _ZN7Bavieca10BaviecaAPI7rescoreEff@12 @45
+    _ZN7Bavieca10BaviecaAPI7rescoreEff@12 @46
+    _ZN7Bavieca10BaviecaAPI7sadFeedEPfj = _ZN7Bavieca10BaviecaAPI7sadFeedEPfj@12 @47
+    _ZN7Bavieca10BaviecaAPI7sadFeedEPfj@12 @48
+    _ZN7Bavieca10BaviecaAPI8attachAMEPNS_17HypothesisLatticeEPKc = _ZN7Bavieca10BaviecaAPI8attachAMEPNS_17HypothesisLatticeEPKc@12 @49
+    _ZN7Bavieca10BaviecaAPI8attachAMEPNS_17HypothesisLatticeEPKc@12 @50
+    _ZN7Bavieca10BaviecaAPI8attachAMEPNS_17HypothesisLatticeEPfj = _ZN7Bavieca10BaviecaAPI8attachAMEPNS_17HypothesisLatticeEPfj@16 @51
+    _ZN7Bavieca10BaviecaAPI8attachAMEPNS_17HypothesisLatticeEPfj@16 @52
+    _ZN7Bavieca10BaviecaAPI8attachLMEPNS_17HypothesisLatticeE = _ZN7Bavieca10BaviecaAPI8attachLMEPNS_17HypothesisLatticeE@8 @53
+    _ZN7Bavieca10BaviecaAPI8attachLMEPNS_17HypothesisLatticeE@8 @54
+    _ZN7Bavieca10BaviecaAPI8mllrFeedEPKcPfj = _ZN7Bavieca10BaviecaAPI8mllrFeedEPKcPfj@16 @55
+    _ZN7Bavieca10BaviecaAPI8mllrFeedEPKcPfj@16 @56
+    _ZN7Bavieca10BaviecaAPI9alignFileEPKcS2_S2_ = _ZN7Bavieca10BaviecaAPI9alignFileEPKcS2_S2_@16 @57
+    _ZN7Bavieca10BaviecaAPI9alignFileEPKcS2_S2_@16 @58
+    _ZN7Bavieca10BaviecaAPI9computePPEPNS_17HypothesisLatticeE = _ZN7Bavieca10BaviecaAPI9computePPEPNS_17HypothesisLatticeE@8 @59
+    _ZN7Bavieca10BaviecaAPI9computePPEPNS_17HypothesisLatticeE@8 @60
+    _ZN7Bavieca10BaviecaAPI9mllrAdaptEv = _ZN7Bavieca10BaviecaAPI9mllrAdaptEv@4 @61
+    _ZN7Bavieca10BaviecaAPI9mllrAdaptEv@4 @62
+    _ZN7Bavieca10BaviecaAPIC1EPKc @63
+    _ZN7Bavieca10BaviecaAPIC2EPKc @64
+    _ZN7Bavieca10BaviecaAPID1Ev @65
+    _ZN7Bavieca10BaviecaAPID2Ev @66
+    addPathToLattice = addPathToLattice@20 @67
+    addPathToLattice@20 @68
+    align = align@24 @69
+    align@24 @70
+    alignFile = alignFile@16 @71
+    alignFile@16 @72
+    alignReferenceText = alignReferenceText@12 @73
+    alignReferenceText@12 @74
+    attachAM = attachAM@16 @75
+    attachAM@16 @76
+    attachAMFromFile = attachAMFromFile@12 @77
+    attachAMFromFile@12 @78
+    attachLM = attachLM@8 @79
+    attachLM@8 @80
+    bar = bar@4 @81
+    bar@4 @82
+    computePP = computePP@8 @83
+    computePP@8 @84
+    create = create@4 @85
+    create@4 @86
+    decBeginUtterance = decBeginUtterance@4 @87
+    decBeginUtterance@4 @88
+    decEndUtterance = decEndUtterance@4 @89
+    decEndUtterance@4 @90
+    decGetHypothesis = decGetHypothesis@8 @91
+    decGetHypothesis@8 @92
+    decProcess = decProcess@12 @93
+    decProcess@12 @94
+    extractFeatures = extractFeatures@16 @95
+    extractFeatures@16 @96
+    extractFeaturesFromFile = extractFeaturesFromFile@12 @97
+    extractFeaturesFromFile@12 @98
+    foo = foo@0 @99
+    foo@0 @100
+    freeAssessment = freeAssessment@12 @101
+    freeAssessment@12 @102
+    freeFeatures = freeFeatures@8 @103
+    freeFeatures@8 @104
+    freeSpeechSegments = freeSpeechSegments@8 @105
+    freeSpeechSegments@8 @106
+    freeWordAlignments = freeWordAlignments@12 @107
+    freeWordAlignments@12 @108
+    freeWordHypothesis = freeWordHypothesis@12 @109
+    freeWordHypothesis@12 @110
+    getAssessment = getAssessment@20 @111
+    getAssessment@20 @112
+    getLattice = getLattice@4 @113
+    getLattice@4 @114
+    initialize = initialize@16 @115
+    initialize@16 @116
+    rescore = rescore@12 @117
+    rescore@12 @118
+    rescoreLattice = rescoreLattice@16 @119
+    rescoreLattice@16 @120
+    sadBeginSession = sadBeginSession@4 @121
+    sadBeginSession@4 @122
+    sadEndSession = sadEndSession@4 @123
+    sadEndSession@4 @124
+    sadFeed = sadFeed@12 @125
+    sadFeed@12 @126
+    sadRecoverSpeechSegments = sadRecoverSpeechSegments@8 @127
+    sadRecoverSpeechSegments@8 @128
+    storeLatticeAsText = storeLatticeAsText@12 @129
+    storeLatticeAsText@12 @130
+    uninitialize = uninitialize@4 @131
+    uninitialize@4 @132

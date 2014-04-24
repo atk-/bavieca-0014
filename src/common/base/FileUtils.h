@@ -24,6 +24,9 @@
 #include <stdio.h>
 #include <assert.h>
 #include <sys/stat.h>
+#ifdef __MINGW32__
+#include <io.h>
+#endif
 
 namespace Bavieca {
 
@@ -79,7 +82,10 @@ class FileUtils {
 		// create the given path 
 		// it goes from left to right trying to create the folder
 		static int createPath(const char *strPath, mode_t mode = 0777);
-
+	#elif defined __MINGW32__
+		// no mode parameters under Windows
+		static int createFolder(const char *strFolder);
+		static int createPath(const char *strPath);
 	#endif
 		
 };

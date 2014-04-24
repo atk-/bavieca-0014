@@ -16,9 +16,9 @@
  * limitations under the License.                                                              *
  *---------------------------------------------------------------------------------------------*/
 
-
 #include "BaviecaAPI.h"
 
+#include "Viterbi.h"
 #include "ViterbiX.h"
 #include "AlignmentFile.h"
 #include "AudioFile.h"
@@ -47,11 +47,11 @@ namespace Bavieca {
 
 // constructor (receives default configuration parameters)
 BaviecaAPI::BaviecaAPI(const char *strFileConfiguration) {
-
+	printf("constructor called\n");
 	assert(strFileConfiguration);
 	m_strFileConfiguration = new char[strlen(strFileConfiguration)+1];
 	strcpy(m_strFileConfiguration,strFileConfiguration);
-	
+	printf("config file name stored\n");
 	m_configuration = NULL;
 	m_featureExtractor = NULL;
 	m_phoneSet = NULL;
@@ -71,8 +71,17 @@ BaviecaAPI::~BaviecaAPI() {
 	delete [] m_strFileConfiguration;
 }
 
+BaviecaAPI* ADDCALL BaviecaAPI::create(const char *configFile, unsigned char iFlags, ParamValuesI *paramValues, int paramCount) {
+	printf("constructing...\n");
+	BaviecaAPI* api = new BaviecaAPI(configFile);
+	printf("constructed, initializing...\n");
+	api->initialize(iFlags, paramValues, paramCount);
+	printf("initialization complete!\n");
+	return api;
+}
+
 // initialize API (overriding parameters as needed)
-bool BaviecaAPI::initialize(unsigned char iFlags, ParamValuesI *paramValues) {
+bool ADDCALL BaviecaAPI::initialize(unsigned char iFlags, ParamValuesI *paramValues, unsigned int paramCount) {
 
 	assert(m_bInitialized == false);
 
@@ -80,18 +89,27 @@ bool BaviecaAPI::initialize(unsigned char iFlags, ParamValuesI *paramValues) {
 	
 		m_iFlags = iFlags;
 	
+		printf("loading config parameters...\n");
 		// (1) load configuration parameters
 		m_configuration = new ConfigurationBavieca(m_strFileConfiguration);
 		m_configuration->load();
 		
+		printf("applying overrides...\n");
 		// (2) override parameters if needed
-		if (paramValues) {	
-			for(unsigned int i=0 ; i < paramValues->size() ; ++i) {
+		if ( paramValues) {
+			printf("overriding params (%d in total):\n", paramCount);
+			for(unsigned int i=0 ; i < paramCount ; ++i) {
+				ParamValueI *p = paramValues->getParamValue(i);
+//				const char *pp = (*p).getParameter();
+//				const char *pv = p->getValue();
+
+				printf("%d: %s = %s\n", i, paramValues->getParamValue(i)->getParameter(), paramValues->getParamValue(i)->getValue());
 				m_configuration->setParameterValue(paramValues->getParamValue(i)->getParameter(),
 					paramValues->getParamValue(i)->getValue());
 			}
 		}
 		
+		printf("reading config...\n");
 		// (3) get configuration parameters
 		
 		// phone set
@@ -114,15 +132,18 @@ bool BaviecaAPI::initialize(unsigned char iFlags, ParamValuesI *paramValues) {
 			m_fWarpFactor = (float)atof(m_configuration->getParameterValue("feature.warpFactor"));
 		}
 		
+		printf("loading phone set...\n");
 		// load the phone set
 		m_phoneSet = new PhoneSet(m_strFilePhoneSet); 
 		m_phoneSet->load();
 	
+		printf("loading HMMs...\n");
 		// load the HMMs used for the estimation
 		m_hmmManager = new HMMManager(m_phoneSet,HMM_PURPOSE_EVALUATION);
 		m_hmmManager->load(m_strFileAcousticModels);
 		m_hmmManager->initializeDecoding();
 		
+		printf("loading feature config...\n");
 		// load the feature configuration
 		const char *m_strFileConfigurationFeatures = m_configuration->getStrParameterValue("feature.configurationFile");
 		ConfigurationFeatures *configurationFeatures = new ConfigurationFeatures(m_strFileConfigurationFeatures);
@@ -132,6 +153,7 @@ bool BaviecaAPI::initialize(unsigned char iFlags, ParamValuesI *paramValues) {
 		int m_iCepstralNormalizationMode = FeatureExtractor::getNormalizationMode(m_strCepstralNormalizationMode);
 		int m_iCepstralNormalizationMethod = FeatureExtractor::getNormalizationMethod(m_strCepstralNormalizationMethod);
 		
+		printf("creating feature extractor...\n");
 		// create the feature extractor
 		m_featureExtractor = new FeatureExtractor(configurationFeatures,m_fWarpFactor,
 			m_iCepstralNormalizationBufferSize,m_iCepstralNormalizationMode,m_iCepstralNormalizationMethod);
@@ -159,6 +181,7 @@ bool BaviecaAPI::initialize(unsigned char iFlags, ParamValuesI *paramValues) {
 		
 		// aligner
 		if (m_iFlags & INIT_ALIGNER) {
+			printf("initializing aligner...\n");
 		
 			// make sure required configuration parameters are defined
 			if (!m_configuration->areAlignerParametersSet()) {
@@ -179,6 +202,7 @@ bool BaviecaAPI::initialize(unsigned char iFlags, ParamValuesI *paramValues) {
 		
 		// decoder
 		if (m_iFlags & INIT_DECODER) {
+			printf("initializing decoder...\n");
 		
 			// make sure required configuration parameters are defined
 			if (!m_configuration->areDecodingParametersSet()) {
@@ -249,8 +273,10 @@ bool BaviecaAPI::initialize(unsigned char iFlags, ParamValuesI *paramValues) {
 												m_strLanguageModelType,
 												m_strLanguageModelNGram); 
 			m_lmManager->load();
+			printf("building LM graph...\n");
 			m_lmManager->buildLMGraph();
-			
+
+			printf("creating decoding network...\n");
 			m_networkBuilder = new NetworkBuilderX(m_phoneSet,m_hmmManager,m_lexiconManager);
 			
 			// build the decoding network
@@ -259,11 +285,12 @@ bool BaviecaAPI::initialize(unsigned char iFlags, ParamValuesI *paramValues) {
 				BVC_ERROR << "unable to build the network";
 			}
 		
+			printf("constructing decoder...\n");
 			m_dynamicDecoder = new DynamicDecoderX(m_phoneSet,m_hmmManager,m_lexiconManager,
 					m_lmManager,m_fLanguageModelScalingFactor,m_iNGram,m_network,m_iMaxActiveArcs,
 					m_iMaxActiveArcsWE,m_iMaxActiveTokensArc,m_fBeamWidthArcs,m_fBeamWidthArcsWE,m_fBeamWidthTokensArc,
 					m_bLatticeGeneration,m_iMaxWordSequencesState);
-					
+			printf("initializing decoder...\n");
 			m_dynamicDecoder->initialize();
 		}
 		
@@ -272,7 +299,8 @@ bool BaviecaAPI::initialize(unsigned char iFlags, ParamValuesI *paramValues) {
 			
 		}
 			
-	} catch (ExceptionBase) {	
+	} catch (ExceptionBase ex) {
+		printf("%s\n", ex.what());
 		return false;
 	}	
 
@@ -281,7 +309,7 @@ bool BaviecaAPI::initialize(unsigned char iFlags, ParamValuesI *paramValues) {
 }
 
 // uninitialize the API	
-void BaviecaAPI::uninitialize() {
+void ADDCALL BaviecaAPI::uninitialize() {
 
 	assert(m_bInitialized);
 	
@@ -321,16 +349,22 @@ void BaviecaAPI::uninitialize() {
 	m_bInitialized = false;	
 }
 
+// extract features from an audio file
+float ADDCALL *BaviecaAPI::extractFeatures(const char* wavFile, unsigned int* iFeatures) {
+	return m_featureExtractor->extractFeatures(wavFile, iFeatures);
+}
+
 // extract features from the audio
-float *BaviecaAPI::extractFeatures(short *sSamples, unsigned int iSamples, unsigned int *iFeatures) {
+float ADDCALL *BaviecaAPI::extractFeatures(short *sSamples, unsigned int iSamples, unsigned int *iFeatures) {
 
 	assert(m_bInitialized);
-	
+	printf("is initialized...\n");
 	return m_featureExtractor->extractFeaturesStream(sSamples,iSamples,iFeatures);
+	//return m_featureExtractor->extractFeatures(sSamples,iSamples,iFeatures);
 }
 
 // return feature dimensionality
-int BaviecaAPI::getFeatureDim() {
+int ADDCALL BaviecaAPI::getFeatureDim() {
 
 	assert(m_bInitialized);
 	assert(m_featureExtractor);	
@@ -338,13 +372,13 @@ int BaviecaAPI::getFeatureDim() {
 }
 
 // free features extracted using extractFeatures(...)
-void BaviecaAPI::free(float *fFeatures) {
+void ADDCALL BaviecaAPI::free(float *fFeatures) {
 
 	delete [] fFeatures;		
 }
 
 // start a SAD session
-void BaviecaAPI::sadBeginSession() {
+void ADDCALL BaviecaAPI::sadBeginSession() {
 	
 	assert(m_bInitialized);
 	m_featureExtractor->resetStream();
@@ -352,21 +386,21 @@ void BaviecaAPI::sadBeginSession() {
 }
 
 // terminate a SAD session
-void BaviecaAPI::sadEndSession() {
+void ADDCALL BaviecaAPI::sadEndSession() {
 
 	assert(m_bInitialized);
 	m_sadModule->endSession();
 }
 
 // proces the given features
-void BaviecaAPI::sadFeed(float *fFeatures, unsigned int iFeatures) {
+void ADDCALL BaviecaAPI::sadFeed(float *fFeatures, unsigned int iFeatures) {
 
 	assert(m_bInitialized);
 	m_sadModule->processFeatures(fFeatures,iFeatures);
 }
 
 // recover speech segments by doing back-tracking on the grid
-SpeechSegmentsI *BaviecaAPI::sadRecoverSpeechSegments() {
+SpeechSegmentsI ADDCALL *BaviecaAPI::sadRecoverSpeechSegments() {
 
 	//m_sadModule->printGrid();
 	assert(m_bInitialized);
@@ -386,30 +420,95 @@ SpeechSegmentsI *BaviecaAPI::sadRecoverSpeechSegments() {
 }
 
 // forced alignment between features and audio
-AlignmentI *BaviecaAPI::align(float *fFeatures, unsigned int iFeatures, const char *strText, 
+Alignment* ADDCALL BaviecaAPI::align(float *fFeatures, unsigned int iFeatures, const char *strText,
 	bool bMultiplePronunciations) {
 
 	assert(m_bInitialized);
 	VLexUnit vLexUnit;
 	bool bAllKnown;
-	
+
 	if (m_lexiconManager->getLexUnits(strText,vLexUnit,bAllKnown) == false) {
+		printf("lex units are NULL\n");
 		return NULL;
-	}
+	} else printf("got lexunits\n");
+
+//	printf("vlexunit has %d elements\n", vLexUnit.size());
+//	if (vLexUnit.size() > 0) {
+//		for (VLexUnit::iterator it = vLexUnit.begin(); it != vLexUnit.end(); it++)
+//			printf("%d %d\n", (*it)->iIndex, (*it)->iLexUnit);
+//	}
+
 	if (bAllKnown == false) {
+		printf("allKnown is false\n");
 		return NULL;
-	}	
+	} printf("all known ok\n");
+
 	// create the aligner
 	double dUtteranceLikelihood;
 	int iErrorCode;
 	
 	VLexUnit vLexUnitOptional;
 	vLexUnitOptional.push_back(m_lexiconManager->getLexUnitSilence());
+
+	printf("processing utterance...");
+
+	// build a new Viterbi aligner if necessary
+	if (m_viterbiX == NULL) {
+		// TODO parameterize the values
+		m_viterbiX = new ViterbiX(m_phoneSet,m_lexiconManager,m_hmmManager,1000,2000,true,2000);
+	}
+
 	Alignment *alignment = m_viterbiX->processUtterance(vLexUnit,bMultiplePronunciations,
 			vLexUnitOptional,fFeatures,iFeatures,&dUtteranceLikelihood,iErrorCode);
+	printf("ok\n");
+
 	if (alignment == NULL) {
+		printf("alignment is null\n");
 		return NULL;
 	}
+
+	return alignment;
+
+//	VPhoneAlignment *vPhoneAlignment = alignment->getPhoneAlignment(m_lexiconManager);
+//	if (vPhoneAlignment == NULL) {
+//		return NULL;
+//	}
+//
+//	VLexUnitAlignment *vLexUnitAlignment = AlignmentFile::getVLexUnitAlignment(*vPhoneAlignment);
+//	assert(vLexUnitAlignment);
+//	assert(vLexUnitAlignment->size() >= vLexUnit.size());
+//	vector<WordAlignmentI*> vWordAlignmentI;
+//	int iPhone = 0;
+//	int i=0;
+//	for(VLexUnitAlignment::iterator it = vLexUnitAlignment->begin() ; it != vLexUnitAlignment->end() ; ++it, ++i) {
+//		const char *strLexUnit = m_lexiconManager->getStrLexUnitPron((*it)->lexUnit->iLexUnitPron);
+//		// phone-alignment
+//		vector<PhoneAlignmentI*> vPhoneAlignmentI;
+//		for(unsigned int j=0 ; j<(*it)->lexUnit->vPhones.size() ; ++j) {
+//			const char *strPhone = m_phoneSet->getStrPhone((*vPhoneAlignment)[iPhone]->iPhone);
+//			assert(strPhone);
+//			PhoneAlignmentI *phoneAlignmentI = new PhoneAlignmentI(strPhone,
+//				(*vPhoneAlignment)[iPhone]->iStateBegin[0],
+//				(*vPhoneAlignment)[iPhone]->iStateEnd[NUMBER_HMM_STATES-1]);
+//			vPhoneAlignmentI.push_back(phoneAlignmentI);
+//			++iPhone;
+//		}
+//		WordAlignmentI *wordAlignmentI = new WordAlignmentI(strLexUnit,(*it)->iBegin,(*it)->iEnd,vPhoneAlignmentI);
+//		vWordAlignmentI.push_back(wordAlignmentI);
+//	}
+//
+//	AlignmentFile::destroyPhoneAlignment(vPhoneAlignment);
+//	AlignmentFile::destroyLexUnitAlignment(vLexUnitAlignment);
+//	delete alignment;
+//
+//	return new AlignmentI(vWordAlignmentI);
+}
+
+AlignmentI* ADDCALL BaviecaAPI::alignI(float *fFeatures, unsigned int iFeatures, const char *strText,
+	bool bMultiplePronunciations) {
+	Alignment *alignment = align(fFeatures, iFeatures, strText, bMultiplePronunciations);
+
+	if ( alignment == NULL ) return NULL;
 
 	VPhoneAlignment *vPhoneAlignment = alignment->getPhoneAlignment(m_lexiconManager);
 	if (vPhoneAlignment == NULL) {
@@ -418,7 +517,7 @@ AlignmentI *BaviecaAPI::align(float *fFeatures, unsigned int iFeatures, const ch
 
 	VLexUnitAlignment *vLexUnitAlignment = AlignmentFile::getVLexUnitAlignment(*vPhoneAlignment);
 	assert(vLexUnitAlignment);
-	assert(vLexUnitAlignment->size() >= vLexUnit.size());
+	//assert(vLexUnitAlignment->size() >= vLexUnit.size());
 	vector<WordAlignmentI*> vWordAlignmentI;
 	int iPhone = 0;
 	int i=0;
@@ -437,27 +536,50 @@ AlignmentI *BaviecaAPI::align(float *fFeatures, unsigned int iFeatures, const ch
 		}
 		WordAlignmentI *wordAlignmentI = new WordAlignmentI(strLexUnit,(*it)->iBegin,(*it)->iEnd,vPhoneAlignmentI);
 		vWordAlignmentI.push_back(wordAlignmentI);
-	}	
-	
+	}
+
 	AlignmentFile::destroyPhoneAlignment(vPhoneAlignment);
 	AlignmentFile::destroyLexUnitAlignment(vLexUnitAlignment);
 	delete alignment;
-	
+
 	return new AlignmentI(vWordAlignmentI);
+
+}
+
+Alignment* ADDCALL BaviecaAPI::alignFile(const char *strFeatureFile, const char *strText, const char *alignmentFile) {
+	printf("**1.1\n");
+	FeatureFile *featureFile = new FeatureFile(strFeatureFile, MODE_READ);
+	printf("**1.2\n");
+	featureFile->load();
+	unsigned int iFeatures = -1;
+	printf("**1.3\n");
+	float *fFeatures = featureFile->getFeatureVectors(&iFeatures);
+	printf("**1.4\n");
+	Alignment *a = align(fFeatures, iFeatures, strText, true);
+	printf("**1.5\n");
+	if ( a == NULL ) {
+		printf("warning: alignment was null\n");
+	} else {
+		a->store(alignmentFile);
+	}
+	printf("**1.6\n");
+	return a;
 }
 
 // DECODING ------------------------------------------------------------------------------------------
 
 // signal beginning of utterance
-void BaviecaAPI::decBeginUtterance() {
-
+void ADDCALL BaviecaAPI::decBeginUtterance() {
+	printf("decBeginUtterance()\n");
 	assert(m_bInitialized);
+	printf("initialized\n");
 	assert(m_iFlags & INIT_DECODER);
+	printf("decoding flag set\n");
 	m_dynamicDecoder->beginUtterance();
 }
 
 // process feature vectors from an utterance
-void BaviecaAPI::decProcess(float *fFeatures, unsigned int iFeatures) {
+void ADDCALL BaviecaAPI::decProcess(float *fFeatures, unsigned int iFeatures) {
 
 	assert(m_bInitialized);
 	assert(m_iFlags & INIT_DECODER);
@@ -465,14 +587,21 @@ void BaviecaAPI::decProcess(float *fFeatures, unsigned int iFeatures) {
 }
 
 // get decoding results
-HypothesisI *BaviecaAPI::decGetHypothesis(const char *strFileHypothesisLattice) {
-
+HypothesisI ADDCALL *BaviecaAPI::decGetHypothesis(const char *strFileHypothesisLattice) {
+	printf("initialized?\n");
 	assert(m_bInitialized);
+	printf("yes\n");
+	printf("decoding?\n");
 	assert(m_iFlags & INIT_DECODER);
+	printf("yes\n");
 	
 	// best path
 	vector<WordHypothesisI*> vWordHypothesisI;
 	BestPath *bestPath = m_dynamicDecoder->getBestPath();
+
+	printf("BEST PATH:\n");
+	bestPath->print(true);
+
 	if (bestPath != NULL) {
 		VLexUnit vLexUnit;
 		LBestPathElement *lBestPathElements = bestPath->getBestPathElements();
@@ -489,11 +618,18 @@ HypothesisI *BaviecaAPI::decGetHypothesis(const char *strFileHypothesisLattice) 
 	
 	// hypothesis lattice
 	if (strFileHypothesisLattice) {
-		assert(m_bLatticeGeneration);
+		//assert(m_bLatticeGeneration);
 		HypothesisLattice *hypothesisLattice = m_dynamicDecoder->getHypothesisLattice();
 		if (hypothesisLattice != NULL) {
-			//hypothesisLattice->store(strFileHypothesisLattice,FILE_FORMAT_TEXT);
-			hypothesisLattice->store(strFileHypothesisLattice,FILE_FORMAT_BINARY);
+			// write the text lattice...
+			char filename[strlen(strFileHypothesisLattice) + 4];
+			strcpy(filename, strFileHypothesisLattice);
+			strcat(filename, ".txt");
+			hypothesisLattice->store(filename,FILE_FORMAT_TEXT);
+			// ...and the binary lattice
+			strcpy(filename, strFileHypothesisLattice);
+			strcat(filename, ".bin");
+			hypothesisLattice->store(filename,FILE_FORMAT_BINARY);
 			delete hypothesisLattice;
 		}
 	}
@@ -502,7 +638,7 @@ HypothesisI *BaviecaAPI::decGetHypothesis(const char *strFileHypothesisLattice) 
 }
 
 // signal end of utterance
-void BaviecaAPI::decEndUtterance() {
+void ADDCALL BaviecaAPI::decEndUtterance() {
 
 	assert(m_bInitialized);
 	assert(m_iFlags & INIT_DECODER);
@@ -510,7 +646,7 @@ void BaviecaAPI::decEndUtterance() {
 }
 
 // return a word-level assessment given a hypothesis and a reference text
-TextAlignmentI *BaviecaAPI::getAssessment(HypothesisI *hypothesisI, const char *strReference) {
+TextAlignmentI ADDCALL *BaviecaAPI::getAssessment(HypothesisI *hypothesisI, const char *strReference) {
 
 	// get lexical units from reference (there might be out-of-vocabulary words <unk>)
 	VLexUnit vLexUnitRef;
@@ -561,24 +697,128 @@ TextAlignmentI *BaviecaAPI::getAssessment(HypothesisI *hypothesisI, const char *
 }
 
 // feed data into speaker adaptation
-void BaviecaAPI::mllrFeed(const char *strReference, float *fFeatures, unsigned int iFeatures) {
+void ADDCALL BaviecaAPI::mllrFeed(const char *strReference, float *fFeatures, unsigned int iFeatures) {
 
 
 }
 
 // adapt current acoustic models using fed adaptation data
-void BaviecaAPI::mllrAdapt() {
+void ADDCALL BaviecaAPI::mllrAdapt() {
 
 
 }
 
+void ADDCALL BaviecaAPI::addPathToLattice(HypothesisLattice *lattice, const char *featureFile, const char *alignmentFile, bool isBest) {
+	Alignment *alignment = Alignment::load(alignmentFile, m_lexiconManager);
+
+	attachLM(lattice);
+	attachAM(lattice, featureFile);
+	//computePP(lattice);
+	lattice->storeTextFormat("lattice-pre.txt");
+	lattice->addPath(alignment, isBest);
+	alignment->store("align.txt");
+	lattice->storeTextFormat("lattice-post.txt");
+	computePP(lattice);
+}
+
+void ADDCALL BaviecaAPI::rescore(float amScore, float lmScore) {
+	HypothesisLattice *lattice = m_dynamicDecoder->getHypothesisLattice();
+	rescoreLattice(lattice, amScore, lmScore);
+}
+
+BestPath* ADDCALL BaviecaAPI::rescoreLattice(HypothesisLattice *lattice, float amFactor, float lmFactor) {
+	lattice->setScalingFactors(amFactor, lmFactor);
+	BestPath *path = lattice->rescore(RESCORING_METHOD_POSTERIORS);
+	lattice->computeConfidenceScore(CONFIDENCE_MEASURE_POSTERIORS);
+	printf("1. POSTERIORS\n");
+	path->print(true);
+
+	path = lattice->rescore(RESCORING_METHOD_POSTERIORS);
+	lattice->computeConfidenceScore(CONFIDENCE_MEASURE_ACCUMULATED);
+	printf("2. ACCUMULATED\n");
+	path->print(true);
+
+	path = lattice->rescore(RESCORING_METHOD_POSTERIORS);
+	lattice->computeConfidenceScore(CONFIDENCE_MEASURE_MAXIMUM);
+	printf("3. MAXIMUM\n");
+	path->print(true);
+
+	return path;
+}
+
+
+void ADDCALL BaviecaAPI::attachLM(HypothesisLattice *lattice) {
+	lattice->attachLMProbabilities(m_lmManager);
+	// also attach insertion penalties
+	lattice->attachInsertionPenalty(m_lexiconManager);
+}
+
+void ADDCALL BaviecaAPI::attachAM(HypothesisLattice *lattice, const char *strFeatureFile) {
+	FeatureFile featureFile = FeatureFile(strFeatureFile, MODE_READ);
+	featureFile.load();
+	unsigned int iFeatures = -1;
+	printf("writing lattice...");
+	lattice->storeTextFormat("lattice.am.txt");
+	printf("done\n");
+	printf("reading features from %s... ", strFeatureFile);
+	float *fFeatures = featureFile.getFeatureVectors(&iFeatures);
+	printf("done\n");
+
+	attachAM(lattice, fFeatures, iFeatures);
+}
+
+void ADDCALL BaviecaAPI::attachAM(HypothesisLattice *lattice, float *fFeatures, unsigned int iFeatures) {
+	// HMM marking is required for acoustic model scoring
+	printf("attempting hmm marking...");
+	printf("is hmm manager null? %d\n", (m_hmmManager == NULL));
+	lattice->hmmMarking(m_hmmManager);
+	printf("done\n");
+
+	printf("feature count is %d\n", iFeatures);
+	printf("constructing Viterbi aligner...\n");
+	// create the Viterbi aligner
+	Viterbi viterbi(m_phoneSet, m_hmmManager, m_lexiconManager, 1000.0);
+
+	printf("aligning... ");
+	if (viterbi.align(fFeatures, iFeatures, lattice) == false) {
+		BVC_ERROR << "unable to generate phone-level alignments for the lattice";
+	}
+	printf("done.\n");
+}
+
+void ADDCALL BaviecaAPI::computePP(HypothesisLattice *lattice) {
+	lattice->computeForwardBackwardScores(10.0f, 10.0f);
+	lattice->computePosteriorProbabilities();
+}
+
+void ADDCALL BaviecaAPI::alignReferenceText(HypothesisLattice *lattice, const char *refText) {
+	// get lexical units from the string
+	VLexUnit *vRef = new VLexUnit();
+	bool allKnown = false;
+	bool result = m_lexiconManager->getLexUnits(refText, *vRef, allKnown);
+	printf("getLexUnits(): %s\n", result ? "true" : "false");
+
+	// get lexical units from the hypothesis lattice
+	VLexUnit *vHyp = new VLexUnit();
+	BestPath *bestPath = lattice->getBestPath();
+	bestPath->getLexUnits(*vHyp);
+
+	// perform the alignment
+	TextAligner aligner = TextAligner(m_lexiconManager);
+	TextAlignment *alignment = aligner.align(*vHyp, *vRef);
+
+	printf("store alignment\n");
+	alignment->store("alignment.txt", true);
+}
+
+HypothesisLattice* ADDCALL BaviecaAPI::getHypothesisLattice()  {
+	return m_dynamicDecoder->getHypothesisLattice();
+}
+
+void ADDCALL BaviecaAPI::storeLatticeAsText(HypothesisLattice *lattice, const char *filename) {
+	lattice->storeTextFormat(filename);
+}
+
 };	// end-of-namespace
-
-
-
-
-
-
-
 
 

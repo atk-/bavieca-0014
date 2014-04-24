@@ -257,7 +257,7 @@ class HypothesisLattice {
 	public:
 
 		// constructor
-		HypothesisLattice(PhoneSet *phoneSet, LexiconManager *lexiconManager, bool bVerbose = false);
+		HypothesisLattice(PhoneSet *phoneSet, LexiconManager *lexiconManager, bool bVerbose = true);
 
 		// destructor
 		~HypothesisLattice();
@@ -353,6 +353,7 @@ class HypothesisLattice {
 			ledge->iPhones = 0;
 			ledge->phoneAlignment = NULL;
 			ledge->fPhoneAccuracy = NULL;
+			ledge->fConfidence = 0.0f;
 			
 			ledge->iContextLeft = NULL;
 			ledge->iContextRight = NULL;
@@ -382,6 +383,7 @@ class HypothesisLattice {
 			ledge->iPhones = edgeOriginal->iPhones;
 			ledge->phoneAlignment = NULL;
 			ledge->fPhoneAccuracy = NULL;
+			ledge->fConfidence = 0.0f;
 			
 			ledge->iContextLeft = edgeOriginal->iContextLeft;
 			ledge->iContextRight = edgeOriginal->iContextRight;

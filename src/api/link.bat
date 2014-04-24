@@ -1,0 +1,3 @@
+g++ -g -L../../../clapack-3.2.1 -L../../../clapack-3.2.1/f2clibs -L../../../cblas/lib -L../../../blas/lib -L..\..\lib\i686-MINGW32_NT-6.1 -shared -o newbavieca.dll ..\..\obj\i686-MINGW32_NT-6.1\api\BaviecaNET.o ..\..\obj\i686-MINGW32_NT-6.1\api\BaviecaAPI.o ..\..\obj\i686-MINGW32_NT-6.1\api\ConfigurationBavieca.o -lcommon -lole32 -s -Wl,-add-stdcall-alias,--output-def,newbavieca.def,--subsystem,windows,--out-implib,newbavieca.lib
+cp newbavieca.dll E:\github\InteractiveBooks\app\aston-wpf\BaviecaDLLTest\shared
+cp newbavieca.dll E:\github\InteractiveBooks\app\aston-wpf\Deployment

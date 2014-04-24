@@ -149,7 +149,8 @@ int FileUtils::createFolder(const char *strFolder, mode_t mode) {
 	// check if the folder exists
 	if (stat(strFolder, &st) != 0) {
 		// the folder does not exist: create it		
-		if (mkdir(strFolder, mode) != 0) {
+//		if (mkdir(strFolder, mode) != 0) {
+		if (mkdir(strFolder) != 0) {
 			return RETURN_CODE_ERROR;
 		}
 	}
@@ -182,6 +183,54 @@ int FileUtils::createPath(const char *strPath, mode_t mode) {
 	if (iReturnCode == RETURN_CODE_SUCCESS) {
 		iReturnCode = createFolder(strPath);
 	}	
+	delete [] strAux;
+
+	return iReturnCode;
+}
+
+#elif __MINGW32__
+
+// create the given folder
+int FileUtils::createFolder(const char *strFolder) {
+
+	struct stat st;
+
+	// check if the folder exists
+	if (stat(strFolder, &st) != 0) {
+		// the folder does not exist: create it
+		if (mkdir(strFolder) != 0) {
+			return RETURN_CODE_ERROR;
+		}
+	}
+	// folder exists already!
+	else if (!S_ISDIR(st.st_mode)) {
+		return RETURN_CODE_NOT_FOLDER;
+	}
+
+	return RETURN_CODE_SUCCESS;
+}
+
+// create the given path
+// it goes from left to right trying to create the folder
+int FileUtils::createPath(const char *strPath) {
+
+	int iReturnCode = RETURN_CODE_SUCCESS;
+	char *strAux = new char[strlen(strPath)+1];
+	strcpy(strAux,strPath);
+
+	char *strP1 = strAux;
+	char *strP2;
+	while((iReturnCode == RETURN_CODE_SUCCESS) && ((strP2 = strchr(strP1,'/')) != 0)) {
+		if (strP2 != strP1) {
+			*strP2 = '\0';
+			iReturnCode = createFolder(strAux);
+			*strP2 = '/';
+		}
+		strP1 = strP2 + 1;
+	}
+	if (iReturnCode == RETURN_CODE_SUCCESS) {
+		iReturnCode = createFolder(strPath);
+	}
 	delete [] strAux;
 
 	return iReturnCode;

@@ -21,7 +21,7 @@
 # ---------------------------------------
 
 MAKE = make --quiet -w
-ARCH := $(shell uname -m | sed s/' '//g)
+ARCH := $(shell uname -m | sed "s/ //g")
 OS   := $(shell uname -s)
 
 # ---------------------------------------
@@ -29,11 +29,15 @@ OS   := $(shell uname -s)
 # ---------------------------------------
 
 XCC          = g++
-CPPFLAGS     = -g -Wno-deprecated -msse3 -Wall -O2 -finline-functions
+CPPFLAGS     = -g -Wno-deprecated -msse3 -Wall -O2 -finline-functions -Wno-unknown-pragmas -DBVC_VERBOSE_ENABLED
 # -fPIC generates Position Independent Code, which is needed to build shared libraries 
 # so they can be dynamically relocated, however it may slowdown the code, for this reason
 # it should be avoided for object files that build executables or static libraries
-CPPFLAGS_SHARED = $(CPPFLAGS) -fPIC
+
+# -fPIC is not needed or supported under Windows
+CPPFLAGS_SHARED = $(CPPFLAGS)
+#CPPFLAGS_SHARED = $(CPPFLAGS) -fPIC
+
 AR	     = ar rs
 
 # ---------------------------------------
@@ -42,20 +46,22 @@ AR	     = ar rs
 
 BASE = /home
 
-INCS_DIR_CBLAS = -I$(BASE)/CBLAS/include
-INCS_DIR_LAPACK = -I$(BASE)/CLAPACK-3.2.1/INCLUDE
-LIBS_DIR_CBLAS = -L$(BASE)/CBLAS/lib/ -L$(BASE)/BLAS/ 
-LIBS_DIR_LAPACK = -L$(BASE)/CLAPACK-3.2.1/ -L$(BASE)/CLAPACK-3.2.1/F2CLIBS
-LIB_CBLAS = -lcblas_LINUX -lblas_LINUX -lgfortran
-LIB_LAPACK = -llapack_LINUX -lblas_LINUX3 -lf2c 
+INCS_DIR_CBLAS = -I../../../cblas/include
+INCS_DIR_LAPACK = -I../../../clapack-3.2.1/INCLUDE
+LIBS_DIR_CBLAS = -L../../../cblas/lib -L../../../blas/lib
+LIBS_DIR_LAPACK = -L../../../clapack-3.2.1 -L../../../clapack-3.2.1/f2clibs
+LIB_CBLAS = -lcblas -lblas -lgfortran
+LIB_LAPACK = -llapack -lblas3 -llibf2c
 
 # ----------------------------------------------------
 # Java JNI (Java Native Interface) includes/libraries
 # ----------------------------------------------------
 
-JAVA_BASE = /usr/lib/jvm/java-1.6.0-openjdk-1.6.0.0
-INCS_DIR_JNI = -I$(JAVA_BASE)/include -I$(JAVA_BASE)/include/linux
+#JAVA_BASE = /usr/lib/jvm/java-1.6.0-openjdk-1.6.0.0
+#INCS_DIR_JNI = -I$(JAVA_BASE)/include -I$(JAVA_BASE)/include/linux
 
+JAVA_BASE = "C:\Program Files (x86)\Java\jdk1.6.0_38"
+INCS_DIR_JNI = -I$(JAVA_BASE)/include -I$(JAVA_BASE)/include/win32
 
 
 

@@ -253,11 +253,13 @@ void HMMManager::load(const char *strFile) {
 		// load the dimensionality and the covariance modeling type
 		IOBase::read(file.getStream(),&m_iDim);
 		IOBase::read(file.getStream(),&m_iCovarianceModeling);
+		printf("covariance modeling type in file: %d\n", m_iCovarianceModeling);
 		m_iCovarianceElements = getCovarianceElements(m_iDim,m_iCovarianceModeling);
 		
 		// load the number of phonemes
 		int iPhones = -1;
 		IOBase::read(file.getStream(),&iPhones);
+		printf("a phoneset of size %d is defined, models have %d phones defined\n", (int)m_phoneSet->size(), iPhones);
 		assert(iPhones == (int)m_phoneSet->size());
 		
 		// load the context modeling type

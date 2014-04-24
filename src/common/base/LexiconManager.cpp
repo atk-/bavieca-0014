@@ -617,11 +617,15 @@ bool LexiconManager::getLexUnits(const char *strText, VLexUnit &vLexUnit, bool &
 		if (isspace(strText[i]) != 0) {
 			if (iCharacters > 0) {
 				strLexUnit[iCharacters] = 0;
+				printf("looking up '%s'... ", strLexUnit);
 				LexUnit *lexUnit = getLexUnitPronunciation(strLexUnit);
 				if (lexUnit == NULL) {
+					printf("not found!\n");
 					// the lexical unit is not in the lexicon, replace it by the <UNK> lexical unit
 					lexUnit = m_lexUnitUnknown;
 					bAllKnown = false;
+				} else {
+					printf("ok\n");
 				}
 				vLexUnit.push_back(lexUnit);
 				iCharacters = 0;	
@@ -731,6 +735,7 @@ void LexiconManager::arrangeLexUnits(vector<string> &vStrLexUnit) {
 	
 	// delete lexical units that are not in the language model (except the unknown lexical unit,
 	// the filler lexical units and the sentence delimiters, which are used by the decoder)
+	unsigned int iRemoved = 0;
 	for(VLexUnitX::iterator it = m_lexiconX.begin() ; it != m_lexiconX.end() ; ++it) {
 		if ((*it)->iLexUnit == -1) {
 			// IMPORTANT: sentence delimiters and unknown need to be preserved (are needed by the decoder)
@@ -751,6 +756,7 @@ void LexiconManager::arrangeLexUnits(vector<string> &vStrLexUnit) {
 			// these are words that do not have ids
 			else {
 				printf("lexical unit \"%s\" was removed from the lexicon\n",(*it)->strLexUnit);
+				iRemoved++;
 				for(VLexUnit::iterator jt = (*it)->vLexUnitPronunciations.begin() ; jt != (*it)->vLexUnitPronunciations.end() ; ++jt) {
 					delete *jt;
 				}
@@ -758,6 +764,7 @@ void LexiconManager::arrangeLexUnits(vector<string> &vStrLexUnit) {
 			}
 		}	
 	}
+	printf("%d words were removed\n", iRemoved);
 	
 	// clear the data structures that keep the old arrangement of lexical units
 	m_lexiconX.clear();

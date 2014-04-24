@@ -16,7 +16,6 @@
  * limitations under the License.                                                              *
  *---------------------------------------------------------------------------------------------*/
 
-
 #include "LogMessage.h"
 
 namespace Bavieca {

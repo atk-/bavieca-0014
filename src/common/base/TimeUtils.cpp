@@ -20,12 +20,13 @@
 #include "TimeUtils.h"
 
 #include <string.h>
+#include <cstdio>
 
 #if defined __linux__ || defined __APPLE__
 #include <sys/time.h>
 #elif _WIN32
-#define NOMINMAX
 #include <windows.h>
+#define NOMINMAX
 #endif
 
 namespace Bavieca {

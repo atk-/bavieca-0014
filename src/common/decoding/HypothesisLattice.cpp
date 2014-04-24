@@ -288,6 +288,9 @@ void HypothesisLattice::storeTextFormat(const char *strFile) {
 		if (isProperty(LATTICE_PROPERTY_CONFIDENCE)) {
 			oss << "conf=" << setw(12) << ledge->fConfidence;
 		}
+		if (isProperty(LATTICE_PROPERTY_BEST_PATH)) {
+			oss << " bp=" << setw(12) << ledge->bBestPath;
+		}
 		/*if (ledge->iContextLeft != NULL) {
 			for(int i=0 ; i < m_iContextSizeCW ; ++i) {
 				if (ledge->iContextLeft[i] != m_iPhoneContextPadding) {
@@ -388,6 +391,11 @@ void HypothesisLattice::storeBinaryFormat(const char *strFile) {
 		// write pp?
 		if (isProperty(LATTICE_PROPERTY_PP)) {
 			IOBase::write(file.getStream(),ledge->fPP);
+		}
+
+		// write confidence score? -atk
+		if (isProperty(LATTICE_PROPERTY_CONFIDENCE)) {
+			IOBase::write(file.getStream(), ledge->fConfidence);
 		}
 	}
 	// print the nodes
@@ -517,6 +525,12 @@ void HypothesisLattice::loadBinaryFormat(const char *strFile) {
 		ledge->fPP = -FLT_MAX;	
 		if (isProperty(LATTICE_PROPERTY_PP)) {
 			IOBase::read(file.getStream(),&ledge->fPP);
+		}
+
+		// load confidence? -atk
+		ledge->fConfidence = -FLT_MAX;
+		if (isProperty(LATTICE_PROPERTY_CONFIDENCE)) {
+			IOBase::read(file.getStream(), &ledge->fConfidence);
 		}
 	}
 	
@@ -1579,7 +1593,9 @@ void HypothesisLattice::hmmMarking(HMMManager *hmmManager) {
 	}
 	
 	// update the lattice properties
-	setProperty(LATTICE_PROPERTY_HMMS,"yes");	
+	printf("set property... ");
+	setProperty(LATTICE_PROPERTY_HMMS,"yes");
+	printf("done.\n");
 }
 
 // WER computation ---------------------------------------------------------------------------

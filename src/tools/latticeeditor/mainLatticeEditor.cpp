@@ -48,7 +48,8 @@ int main(int argc, char *argv[]) {
 		commandLineManager.defineParameter("-lm","language model",PARAMETER_TYPE_FILE,true);
 		commandLineManager.defineParameter("-ngram","language model",PARAMETER_TYPE_STRING,
 			true,"zerogram|unigram|bigram|trigram");
-		commandLineManager.defineParameter("-bat","lattices to process",PARAMETER_TYPE_FILE,false);
+		commandLineManager.defineParameter("-lat","lattice to process",PARAMETER_TYPE_FILE,true);
+		commandLineManager.defineParameter("-bat","lattices to process",PARAMETER_TYPE_FILE,true);
 		commandLineManager.defineParameter("-act","action to perform",PARAMETER_TYPE_FOLDER,
 			false,"wer|pp|align|compact|rescore|lm|addpath");
 		//commandLineManager.defineParameter("-for","output format",PARAMETER_TYPE_STRING,true,"binary|text","binary");
@@ -295,6 +296,7 @@ int main(int argc, char *argv[]) {
 				
 				// write the lattice to disk
 				hypothesisLattice.store(strFileLatticeOutput);
+				hypothesisLattice.storeTextFormat("lattice.txt");
 		
 				double dTimeEnd = TimeUtils::getTimeMilliseconds();
 				double dTime = (dTimeEnd-dTimeBegin)/1000.0;
@@ -399,7 +401,20 @@ int main(int argc, char *argv[]) {
 				
 				// compute confidence estimates?
 				if (commandLineManager.isParameterSet("-conf")) {
-					hypothesisLattice.computeConfidenceScore(CONFIDENCE_MEASURE_MAXIMUM);	
+					const char *confParam = commandLineManager.getParameterValue("-conf");
+					int conf = CONFIDENCE_MEASURE_NONE;
+
+					if ( strcmp(confParam, CONFIDENCE_MEASURE_ACCUMULATED_STR) == 0) {
+						conf = CONFIDENCE_MEASURE_ACCUMULATED;
+					} else if ( strcmp(confParam, CONFIDENCE_MEASURE_MAXIMUM_STR) == 0) {
+						conf = CONFIDENCE_MEASURE_MAXIMUM;
+					} else if ( strcmp(confParam, CONFIDENCE_MEASURE_POSTERIORS_STR) == 0) {
+						conf = CONFIDENCE_MEASURE_POSTERIORS;
+					}
+
+					printf("confidence estimation method '%s'\n", confParam);
+
+					hypothesisLattice.computeConfidenceScore(conf);
 				}
 					
 				// write the lattice to disk
@@ -522,13 +537,15 @@ int main(int argc, char *argv[]) {
 						bestPath->write(fileHyp->getStream(),strUtteranceId);
 					} else {	
 						FileOutput fileHyp(strFileHypothesis,false);
-						fileHyp.open();	
+						fileHyp.open();
 						bestPath->write(fileHyp.getStream(),strUtteranceId,strUtteranceId,0.0,false,true,true);
 						fileHyp.close();
 					}
 					delete bestPath;
 				}
 				
+				hypothesisLattice.store(strFileLatticeInput);
+
 				double dTimeEnd = TimeUtils::getTimeMilliseconds();
 				double dTime = (dTimeEnd-dTimeBegin)/1000.0;
 				double dRTF = dTime/(hypothesisLattice.getFrames()/100.0);

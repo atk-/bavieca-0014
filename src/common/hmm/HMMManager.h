@@ -120,6 +120,7 @@ class HMMManager {
 				return iDim;
 			} 
 			else {
+				printf("covariance modelling type: %d\n", iCovarianceModelling);
 				assert(iCovarianceModelling == COVARIANCE_MODELLING_TYPE_FULL);
 				return (iDim*(iDim+1))/2;
 			}	

@@ -108,7 +108,7 @@ struct MLexUnitFunctions
 	// comparison function (used to order elements)
 	bool operator()(const char *strLexUnit1, const char *strLexUnit2) const {	
 		
-		return (strcmp(strLexUnit1,strLexUnit2) < 0);
+		return (strcmp(strLexUnit1,strLexUnit2) == 0);
 	}
 
 #endif
@@ -147,7 +147,8 @@ typedef vector<LexUnitX*> VLexUnitX;
 #if defined __linux__ || defined __APPLE__
 typedef hash_map<const char*,LexUnitX*,MLexUnitFunctions,MLexUnitFunctions> MLexUnit;
 #elif _WIN32
-typedef hash_map<const char*,LexUnitX*,MLexUnitFunctions> MLexUnit;
+using namespace __gnu_cxx;
+typedef hash_map<const char*,LexUnitX*,MLexUnitFunctions,MLexUnitFunctions> MLexUnit;
 #else
 	#error "unsupported platform"
 #endif

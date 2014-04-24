@@ -190,13 +190,3 @@ $(OBJ_DIR)/mainWFSADecoder.o: ./wfsadecoder/mainWFSADecoder.cpp
 
 $(OBJ_DIR)/mainWFSABuilder.o: ./wfsabuilder/mainWFSABuilder.cpp
 	$(XCC) $(CPPFLAGS) $(INC) -c $< -o $@
-
-
-
-
-
-
-
-
-
-

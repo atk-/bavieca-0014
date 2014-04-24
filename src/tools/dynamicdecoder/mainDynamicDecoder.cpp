@@ -218,6 +218,7 @@ int main(int argc, char *argv[]) {
 			viterbi = new Viterbi(&phoneSet,&hmmManager,&lexiconManager);	
 		}
 		
+		printf("loading the language model...\n");
 		// load the language model
 		LMManager lmManager(&lexiconManager,
 									strLanguageModelFile,
@@ -226,23 +227,31 @@ int main(int argc, char *argv[]) {
 									strLanguageModelNGram); 
 		lmManager.load();
 		lmManager.buildLMGraph();
+		printf("...done.\n");
 		
+		printf("constructing network builder\n");
 		NetworkBuilderX networkBuilder(&phoneSet,&hmmManager,&lexiconManager);
 		
 		// build the decoding network
+		printf("building decoding network\n");
 		DynamicNetworkX *network = networkBuilder.build();
 		if (!network) {
 			BVC_ERROR << "unable to build the decoding network";
 		}
 	
+		printf("Constructing decoder object:\n");
+		printf(" * create decoder\n");
 		DynamicDecoderX decoder(&phoneSet,&hmmManager,&lexiconManager,
 				&lmManager,fLanguageModelScalingFactor,iNGram,network,iMaxActiveArcs,
 				iMaxActiveArcsWE,iMaxActiveTokensArc,fBeamWidthArcs,fBeamWidthArcsWE,fBeamWidthTokensArc,
 				bLatticeGeneration,iMaxWordSequencesState);
 	
+		printf(" * initialize decoder\n");
 		// initialize the decoder
 		decoder.initialize();
 		
+		printf("Decoder ready.\n");
+
 		double dTimeBegin = TimeUtils::getTimeMilliseconds();	
 		
 		double dLikelihoodTotal = 0.0;
@@ -252,6 +261,7 @@ int main(int argc, char *argv[]) {
 		// load the batch file
 		BatchFile batchFile(strFileControl,"audio|id");
 		batchFile.load();
+		printf("recognition batch file loaded\n");
 		
 		// (4) extract session-data
 		VUtteranceData vUtteranceData;
@@ -267,6 +277,7 @@ int main(int argc, char *argv[]) {
 			utteranceData.features.fFeatures = NULL;
 			utteranceData.features.iFeatures = -1;
 			vUtteranceData.push_back(utteranceData);
+			printf("read utterance #%d\n", iUtterance);
 		}	
 		
 		// extract features
