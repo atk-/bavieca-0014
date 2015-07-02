@@ -10,15 +10,15 @@ using namespace std;
 #include "BaviecaNET.h"
 #include <windows.h>
 
-void ADDCALL foo(void) {
-	bar("hello world");
-}
-
-const char* ADDCALL bar(const char* str) {
-	printf("%s\n", str);
-
-	return mstr(str);
-}
+//void ADDCALL foo(void) {
+//	bar("hello world");
+//}
+//
+//const char* ADDCALL bar(const char* str) {
+//	printf("%s\n", str);
+//
+//	return mstr(str);
+//}
 
 ///// CREATION, INITIALIZATION AND UNINITIALIZATION
 
@@ -55,14 +55,38 @@ float* ADDCALL extractFeaturesFromFile(Bavieca::BaviecaAPI* api, const char* wav
 }
 
 float* ADDCALL extractFeatures(Bavieca::BaviecaAPI* api, short* sSamples, unsigned int iSamples, unsigned int* iFeatures) {
-	printf("extracting features (sample count %d)\n", iSamples);
+	printf("extracting features in stream mode (sample count %d)\n", iSamples);
 	float* features = api->extractFeatures(sSamples, iSamples, iFeatures);
 	printf("extracted %d features\n", *iFeatures);
 	return features;
 }
 
+float* ADDCALL extractFeaturesStatic(Bavieca::BaviecaAPI* api, short* sSamples, unsigned int iSamples, unsigned int* iFeatures) {
+	printf("extracting features in static mode (sample count %d)\n", iSamples);
+	float* features = api->extractFeaturesStatic(sSamples, iSamples, iFeatures);
+	printf("extracted %d features\n", *iFeatures);
+	return features;
+}
+
+void ADDCALL extractFeaturesToFile(Bavieca::BaviecaAPI* api, const char* wavFile,
+		const char* featureFile) {
+	unsigned int iFeatures;
+	float *fFeatures = api->extractFeatures(wavFile, &iFeatures);
+	api->saveFeatures(fFeatures, iFeatures, featureFile);
+}
+
+void ADDCALL saveFeatures(Bavieca::BaviecaAPI *api, float *fFeatures, unsigned int iFeatures,
+		const char* featureFile) {
+	api->saveFeatures(fFeatures, iFeatures, featureFile);
+}
+
 void ADDCALL freeFeatures(Bavieca::BaviecaAPI* api, float *features) {
 	api->free(features);
+}
+
+float* ADDCALL readFeatures(Bavieca::BaviecaAPI* api, const char* featureFile, unsigned int* iFeatures) {
+	return api->readFeatures(featureFile, iFeatures);
+	//return fFeatures;
 }
 
 ///// SAD SESSION FUNCTIONS
@@ -122,6 +146,7 @@ sWordAlignment* ADDCALL align(Bavieca::BaviecaAPI* api, float* fFeatures, unsign
 			strcpy(ret[i].phoneAlignment[j].phone, a->getWord());
 		}
 	}
+
 	return ret;
 }
 
@@ -151,7 +176,7 @@ void ADDCALL decProcess(Bavieca::BaviecaAPI* api, float* fFeatures, unsigned int
 }
 
 sWordHypothesis* ADDCALL decGetHypothesis(Bavieca::BaviecaAPI* api, int *iWords) {
-	Bavieca::HypothesisI* hyp = api->decGetHypothesis("lattice");
+	Bavieca::HypothesisI* hyp = api->decGetHypothesis(NULL); // NULL as lattice file if we don't want one
 
 	// unwrap the vector into an array
 	//Bavieca::WordHypothesisI* ret[hyp->size()];
@@ -167,14 +192,21 @@ sWordHypothesis* ADDCALL decGetHypothesis(Bavieca::BaviecaAPI* api, int *iWords)
 		ret[i].fEnd = h->getFrameEnd();
 	}
 
+	// delete original hypothesis structure!
+	delete hyp;
+
 	return ret;
 }
 
 void ADDCALL freeWordHypothesis(Bavieca::BaviecaAPI* api, Bavieca::WordHypothesisI* wordHypothesis, unsigned int iWords) {
 	// TODO
+//	for (unsigned int i = 0; i < iWords; i++ ) {
+//		printf(wordHypothesis[i].getWord());
+//	}
 	printf("free word hypotheses here\n");
 }
 
+/*
 sTAElement* ADDCALL getAssessment(Bavieca::BaviecaAPI* api, string* words, unsigned int iWordHyps,
 		const char* strReference, int* iElements) {
 	// this is very unwieldy but we can straighten it out later...
@@ -189,6 +221,8 @@ sTAElement* ADDCALL getAssessment(Bavieca::BaviecaAPI* api, string* words, unsig
 
 	// 2. construct a hypothesis object from a vectorful of word hypotheses
 	Bavieca::HypothesisI* hypothesis = new Bavieca::HypothesisI(*vhyp);
+
+	printf("before assessment\n");
 
 	// 3. get the assessment data
 	Bavieca::TextAlignmentI* assessment = api->getAssessment(hypothesis, strReference);
@@ -220,6 +254,7 @@ sTAElement* ADDCALL getAssessment(Bavieca::BaviecaAPI* api, string* words, unsig
 
 	return ret;
 }
+*/
 
 void ADDCALL freeAssessment(Bavieca::BaviecaAPI* api, sTAElement* elements, unsigned int elementCount) {
 	return;

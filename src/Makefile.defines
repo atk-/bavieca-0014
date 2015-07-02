@@ -29,7 +29,8 @@ OS   := $(shell uname -s)
 # ---------------------------------------
 
 XCC          = g++
-CPPFLAGS     = -g -Wno-deprecated -msse3 -Wall -O2 -finline-functions -Wno-unknown-pragmas -DBVC_VERBOSE_ENABLED
+CPPFLAGS     = -g -Wno-deprecated -msse3 -Wall -O2 -finline-functions -Wno-unknown-pragmas
+# -DBVC_VERBOSE_ENABLED
 # -fPIC generates Position Independent Code, which is needed to build shared libraries 
 # so they can be dynamically relocated, however it may slowdown the code, for this reason
 # it should be avoided for object files that build executables or static libraries

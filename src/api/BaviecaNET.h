@@ -30,13 +30,13 @@ extern "C" {
 #endif
 
 /** create a managed string with memory allocation */
-const char* mstr(const char* str) {
-	ULONG ulSize = strlen(str) + sizeof(char);
-	char* ret = NULL;
-	ret = (char*)::CoTaskMemAlloc(ulSize);
-	strcpy(ret, str);
-	return ret;
-}
+//const char* mstr(const char* str) {
+//	ULONG ulSize = strlen(str) + sizeof(char);
+//	char* ret = NULL;
+//	ret = (char*)::CoTaskMemAlloc(ulSize);
+//	strcpy(ret, str);
+//	return ret;
+//}
 
 ///// DEFINE STRUCTS
 
@@ -91,7 +91,16 @@ ADDAPI float* ADDCALL extractFeaturesFromFile(Bavieca::BaviecaAPI* api, const ch
 
 ADDAPI float* ADDCALL extractFeatures(Bavieca::BaviecaAPI* api, short* sSamples, unsigned int iSamples, unsigned int* iFeatures);
 
+ADDAPI float* ADDCALL extractFeaturesStatic(Bavieca::BaviecaAPI* api, short* sSamples, unsigned int iSamples, unsigned int* iFeatures);
+
+// extract features from WAV file to a feature file
+ADDAPI void ADDCALL extractFeaturesToFile(Bavieca::BaviecaAPI* api, const char *wavFile, const char *featureFile);
+
 ADDAPI void ADDCALL freeFeatures(Bavieca::BaviecaAPI* api, float *features);
+
+ADDAPI void ADDCALL saveFeatures(Bavieca::BaviecaAPI* api, float *fFeatures, unsigned int iFeatures, const char *featureFile);
+
+ADDAPI float* ADDCALL readFeatures(Bavieca::BaviecaAPI* api, const char *featureFile, unsigned int* iFeatures);
 
 ///// SAD SESSION FUNCTIONS
 
@@ -138,6 +147,10 @@ ADDAPI void ADDCALL freeAssessment(Bavieca::BaviecaAPI* api, sTAElement* element
 ADDAPI void ADDCALL addPathToLattice(Bavieca::BaviecaAPI* api, Bavieca::HypothesisLattice *lattice, const char *featureFile, const char* alignmentFile, bool isBest);
 
 ADDAPI void ADDCALL rescore(Bavieca::BaviecaAPI* api, float amScore, float lmScore);
+
+ADDAPI inline int ADDCALL getFeatureDim(Bavieca::BaviecaAPI* api) {
+	return api->getFeatureDim();
+}
 
 // TODO make this return the best path instead of void
 ADDAPI inline void ADDCALL rescoreLattice(Bavieca::BaviecaAPI* api, Bavieca::HypothesisLattice *lattice, float amFactor, float lmFactor) {

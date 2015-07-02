@@ -619,13 +619,14 @@ bool LexiconManager::getLexUnits(const char *strText, VLexUnit &vLexUnit, bool &
 				strLexUnit[iCharacters] = 0;
 				printf("looking up '%s'... ", strLexUnit);
 				LexUnit *lexUnit = getLexUnitPronunciation(strLexUnit);
+				printf("got it?\n");
 				if (lexUnit == NULL) {
 					printf("not found!\n");
 					// the lexical unit is not in the lexicon, replace it by the <UNK> lexical unit
 					lexUnit = m_lexUnitUnknown;
 					bAllKnown = false;
 				} else {
-					printf("ok\n");
+					printf("found ok\n");
 				}
 				vLexUnit.push_back(lexUnit);
 				iCharacters = 0;	

@@ -293,7 +293,14 @@ class LexiconManager {
 		
 		// return a lexical unit given the base and the pronunciation number 
 		inline LexUnit *getLexUnit(const char *strLexUnit, unsigned int iPronunciation) {
-		
+
+			if (m_mLexUnit == NULL) {
+				printf("lex unit map is null!\n");
+			}
+
+			printf("hash size is %d\n", m_mLexUnit->size());
+			printf("seeking '%s'\n", strLexUnit);
+
 			MLexUnit::iterator it = m_mLexUnit->find(strLexUnit);
 			if (it == m_mLexUnit->end()) {
 				return NULL;
@@ -320,17 +327,22 @@ class LexiconManager {
 		
 			char strLexUnit[MAX_LEXUNIT_LENGTH];
 			unsigned char iPronunciation;
-			
+			printf("compare lex and sentence marker...\n");
 			if (strcmp(strLexUnitPronunciation,LEX_UNIT_BEGINNING_SENTENCE) == 0) {
+				printf("<s> found\n");
 				return m_lexUnitBegSentence;
 			} else if (strcmp(strLexUnitPronunciation,LEX_UNIT_END_SENTENCE) == 0) {
+				printf("</s> found\n");
 				return m_lexUnitEndSentence;
 			}
 			
+			printf("getting pronunciation... ");
 			if (getLexUnitAndPronunciation(strLexUnitPronunciation,strLexUnit,&iPronunciation) == false) {
+				printf("oops, it's NULL!\n");
 				return NULL;
 			}
-			
+			printf("ok, lexunit is %s\n", strLexUnit);
+			printf("pronunciation number is %d\n", iPronunciation);
 			return getLexUnit(strLexUnit,iPronunciation);
 		}
 		
@@ -475,7 +487,6 @@ class LexiconManager {
 		
 		// return a lexical unit with its pronunciation
 		inline bool getLexUnitAndPronunciation(const char *strLexUnitSrc, char *strLexUnit, unsigned char *iPronunciation) {
-		
 			int iPronunciationAux = 0;
 			const char *cAlternative = strrchr(strLexUnitSrc,'(');
 			if (strLexUnitSrc[strlen(strLexUnitSrc)-1] != ')')
@@ -484,14 +495,14 @@ class LexiconManager {
 				for(int i = 1 ; cAlternative[i] != ')' ; ++i) {
 					// make sure it is a number (by the way this checks that the end of string is not reached before the ')')
 					if ((cAlternative[i] > 57) || (cAlternative[i] < 48)) {	
-						return false;	
+						return false;
 					}
 					iPronunciationAux = iPronunciationAux*10;
 					iPronunciationAux += cAlternative[i]-48;	
 					if (iPronunciationAux >= MAX_LEXUNIT_PRONUNCIATIONS) {
 						return false;
 					}
-				}			
+				}
 				iPronunciationAux--;
 			}
 			if (cAlternative) {

@@ -1,0 +1,25 @@
+in Bavieca:
+
+Global.h:
+* change the #ifdef surrounding NOMINMAX from _WIN32 to _MSC_VER (MS Visual C++ specific macro)
+	(applies to a few other files as well, but since this is only a warning it's not crucial)
+
+LexiconManager.h:
+* "using namespace __gnu_cxx;" required when typedefing MLexUnit as hash_map under Windows; MinGW-specific?
+* hash_map defined differently under Linux and Windows
+* also the comparison operator is! This actually breaks down the whole hashmap since find() does not work!
+
+TimeUtils.cpp:
+* "#include <cstdio>" required to enable sprintf
+
+BaviecaAPI.h:
+* "class extern "X" __declspec(dllexport) BaviecaAPI {" not correctly understood by the compiler (MS-specific code)
+
+FileUtils.h:
+* createPath and createFolder not defined under Windows; needed to import io.h and redefine functions without the mode argument
+
+compiling CLAPACK-3.2.1:
+
+* increase stack size for EIG and LIN tests:
+	- add "-Wl,--stack,33554432" as parameter to ./xeigtst* in TESTING/EIG/Makefile
+	- add "-Wl,--stack,33554432" as parameter to ./xlintstz in TESTING/LIN/Makefile

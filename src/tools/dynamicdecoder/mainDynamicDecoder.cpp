@@ -277,7 +277,7 @@ int main(int argc, char *argv[]) {
 			utteranceData.features.fFeatures = NULL;
 			utteranceData.features.iFeatures = -1;
 			vUtteranceData.push_back(utteranceData);
-			printf("read utterance #%d\n", iUtterance);
+			printf("read utterance #%d (%d samples)\n", iUtterance, iSamples);
 		}	
 		
 		// extract features
@@ -314,6 +314,12 @@ int main(int argc, char *argv[]) {
 			float *fFeatureVectors = it->features.fFeatures;
 			int iFeatureVectors = it->features.iFeatures;
 			
+			if ( iFeatureVectors < 0 ) {
+				BVC_WARNING << "no feature vectors found: check cepstral normalization mode!" << endl;
+			}
+
+			cout << "read " << iFeatureVectors << " feature vectors" << endl;
+
 			decoder.beginUtterance();
 			decoder.process(fFeatureVectors,iFeatureVectors);
 			

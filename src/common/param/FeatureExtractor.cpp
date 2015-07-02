@@ -333,6 +333,11 @@ void FeatureExtractor::extractFeaturesSession(VUtteranceData &vUtteranceData, bo
 }
 
 
+void FeatureExtractor::saveFeatures(float *fFeatures, unsigned int iFeatures, const char *strFeatureFile) {
+	FeatureFile featureFile(strFeatureFile, MODE_WRITE, FORMAT_FEATURES_FILE_DEFAULT, m_iCoefficientsTotal);
+	featureFile.store(fFeatures, iFeatures);
+}
+
 // extract features from a RAW audio file and store them into the given file (utterance-level cepstral normalization)
 void FeatureExtractor::extractFeatures(const char *strFileRaw, const char *strFileFea) {
 
@@ -415,12 +420,10 @@ float *FeatureExtractor::extractStaticFeatures(short *sSamples, unsigned int iSa
 
 	// mfcc
 	if (m_iType == FEATURE_TYPE_MFCC) {
-		printf("MFCC\n");
 		return extractStaticFeaturesMFCC(sSamples,iSamples,iFeatures);
 	} 
 	// plp
 	else if (m_iType == FEATURE_TYPE_PLP) {
-		printf("PLP\n");
 		return extractStaticFeaturesPLP(sSamples,iSamples,iFeatures);
 	} 
 	// not supported

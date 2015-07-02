@@ -322,6 +322,9 @@ class FeatureExtractor {
 		
 		// extract static features 
 		float *extractStaticFeatures(short *sSamples, unsigned int iSamples, unsigned int *iFeatures);	
+
+		// save features into a file
+		void saveFeatures(float *fFeatures, unsigned int iFeatures, const char *strFeatureFile);
 		
 		// print the features (debugging)
 		void print(float *fFeatures, int iFeatures);

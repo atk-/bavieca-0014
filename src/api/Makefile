@@ -30,13 +30,13 @@ OBJFILES_BASE = $(patsubst $(SRC_DIR)/%,$(OBJ_DIR)/%,$(patsubst %.cpp,%.o,$(wild
 OBJFILES_BASE_JAVA = $(patsubst $(SRC_DIR)/%,$(OBJ_DIR)/%,$(patsubst %.cxx,%.o,$(wildcard $(SRC_DIR)/*.cxx)))
 LIBS = -L../../lib/$(ARCH)-$(OS)/ $(LIBS_DIR_CBLAS) $(LIBS_DIR_LAPACK)
 
-all: createDirectories libbaviecaapi.a libbaviecaapi.so libbaviecaapijni.so newbavieca.dll
+all: createDirectories libbaviecaapi.a libbaviecaapi.so libbaviecaapijni.so bavieca-0014.dll
 	@echo $(OBJFILES_BASE)
 
 java-api: createDirectories libbaviecaapijni.so
 	@echo $(OBJFILES_BASE)
 	
-dll: createDirectories newbavieca.dll
+dll: createDirectories bavieca-0014.dll
 	@echo $(OBJFILES_BASE)
 
 clean: 
@@ -44,7 +44,7 @@ clean:
 	rm -rf $(LIB_DIR)/libbaviecaapi.a
 	rm -rf $(LIB_DIR)/libbaviecaapi.so
 	rm -rf $(LIB_DIR)/libbaviecaapijni.so
-	rm -rf $(LIB_DIR)/newbavieca.dll
+	rm -rf $(LIB_DIR)/bavieca-0014.dll
 
 createDirectories: 
 	(mkdir -p $(LIB_DIR))
@@ -66,9 +66,9 @@ libbaviecaapijni.so: $(OBJFILES_BASE) $(OBJFILES_BASE_JAVA)
 	$(XCC) $(LIBS) -shared -o libbaviecaapijni.so $(OBJFILES_BASE) $(OBJFILES_BASE_JAVA) -lcommon_pic
 	(mv libbaviecaapijni.so $(LIB_DIR))
 
-newbavieca.dll: $(OBJFILES_BASE)
-	$(XCC) $(LIBS) -shared -o newbavieca.dll $(OBJFILES_BASE) -lcommon_pic -Wl,-add-stdcall-alias,--output-def,newbavieca.def
-	(mv newbavieca.dll $(LIB_DIR))
+bavieca-0014.dll: $(OBJFILES_BASE)
+	$(XCC) $(LIBS) -shared -o bavieca-0014.dll $(OBJFILES_BASE) -lcommon_pic -Wl,-add-stdcall-alias,--output-def,bavieca-0014.def
+	(mv bavieca-0014.dll $(LIB_DIR))
 
 # ----------------------------------------------
 # create the object files from the source files

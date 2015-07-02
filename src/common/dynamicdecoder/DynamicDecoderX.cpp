@@ -2161,6 +2161,11 @@ HypothesisLattice *DynamicDecoderX::getHypothesisLattice() {
 		HistoryItem *historyItem = *it;	
 		bool bSurvive = false;
 		
+		// DEBUG CODE BEGINS
+		LexUnit *lexUnit = m_lexiconManager->getLexUnitPron(historyItem->iLexUnitPron);
+		//printf("current history item is %s\n", m_lexiconManager->getStrLexUnit(lexUnit->iLexUnit));
+		// DEBUG CODE ENDS
+
 		// above threshold: invalidate redundant word-sequences with lower likelihood
 		if (historyItem->fScore > (fScoreBest-m_fBeamWidthNodesWE)) {
 			
@@ -2173,13 +2178,27 @@ HypothesisLattice *DynamicDecoderX::getHypothesisLattice() {
 				// get the word-sequence by moving the pointer
 				historyItem->iPrev = wgToken[i].iHistoryItem;
 				int iWordSequence = hashWordSequence(historyItem);
+				//printf("  sought hash is %d\n", iWordSequence);
+
 				map<int,pair<float,HistoryItem*> >::iterator it = mWSHistoryItem.find(iWordSequence);
-				assert(it != mWSHistoryItem.end());
-				// invalidate it if necessary
-				if (it->second.second != historyItem) {
-					wgToken[i].iWordSequence = INT_MIN; 
+
+				// DEBUG CODE BEGINS
+				if ( it != mWSHistoryItem.end()) {
+					HistoryItem *hi = it->second.second;
+					LexUnit *lu = m_lexiconManager->getLexUnitPron(hi->iLexUnitPron);
+				}
+				// DEBUG CODE ENDS
+
+				if ( it != mWSHistoryItem.end() ) {
+					//assert(it != mWSHistoryItem.end());
+					// invalidate it if necessary
+					if (it->second.second != historyItem) {
+						wgToken[i].iWordSequence = INT_MIN;
+					} else {
+						bSurvive = true;
+					}
 				} else {
-					bSurvive = true;
+					BVC_WARNING << "expected word sequence was NOT found (hash was " << iWordSequence << ", sought word was " << m_lexiconManager->getStrLexUnit(lexUnit->iLexUnit) << ")";
 				}
 			}	
 			// recover original backpointer

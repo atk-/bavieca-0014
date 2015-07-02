@@ -68,12 +68,12 @@ createDirectories:
 libcommon.a: $(OBJFILES_BASE)
 	$(AR) $@ $?
 	(mv libcommon.a $(LIB_DIR))
-	rm -rf $(OBJ_DIR)
+	#rm -rf $(OBJ_DIR)
 
 libcommon_pic.a: $(OBJFILES_BASE)
 	$(AR) $@ $?
 	(mv libcommon_pic.a $(LIB_DIR))
-	rm -rf $(OBJ_DIR)
+	#rm -rf $(OBJ_DIR)
 
 # ----------------------------------------------
 # create the object files from the source files

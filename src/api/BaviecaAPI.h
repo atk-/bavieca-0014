@@ -216,15 +216,24 @@ class BaviecaAPI {
 		// FEATURE EXTRACTION -------------------------------------------------------------------------------------
 		ADDAPI float ADDCALL *extractFeatures(const char* wavFile, unsigned int* iFeatures);
 		
-		// extract features from the audio
+		// extract features from the audio in stream mode
 		ADDAPI float ADDCALL *extractFeatures(short *sSamples, unsigned int iSamples, unsigned int *iFeatures);
+
+		// extract static features from the audio
+		ADDAPI float ADDCALL *extractFeaturesStatic(short *sSamples, unsigned int iSamples, unsigned int *iFeatures);
 		
 		// return feature dimensionality
 		ADDAPI int ADDCALL getFeatureDim();
 		
 		// free features extracted using extractFeatures(...)
 		ADDAPI void ADDCALL free(float *fFeatures);
+
+		// save features to file
+		ADDAPI void ADDCALL saveFeatures(float *fFeatures, unsigned int iFeatures, const char *featureFile);
 		
+		// read features from a file
+		ADDAPI float ADDCALL *readFeatures(const char* featureFile, unsigned int* iFeatures);
+
 		// SPEECH ACTIVITY DETECTION ------------------------------------------------------------------------------
 		
 		// start a SAD session
@@ -264,7 +273,7 @@ class BaviecaAPI {
 		ADDAPI void ADDCALL decEndUtterance();
 		
 		// return a word-level assessment given a hypothesis and a reference text
-		ADDAPI TextAlignmentI ADDCALL *getAssessment(HypothesisI *hypothesis, const char *strReference);
+		//ADDAPI TextAlignmentI ADDCALL *getAssessment(HypothesisI *hypothesis, const char *strReference);
 				
 		// SPEAKER ADAPTATION ------------------------------------------------------------------------------------
 		
